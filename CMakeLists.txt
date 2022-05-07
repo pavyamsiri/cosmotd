@@ -9,7 +9,7 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 # Add the glfw subdirectory. Subdirectories have their own CMakeLists.txt.
-add_subdirectory(external/glfw-3.3.7)
+add_subdirectory(external/glfw)
 
 # Create an executable with main.cpp as its entry point. glad.c is also to be added as a source file.
 add_executable(cosmotd 
