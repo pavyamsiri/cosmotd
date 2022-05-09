@@ -17,7 +17,11 @@ add_executable(cosmotd
     external/glad/src/glad.c
 )
 # Add the path to the glad `include` directory to the target
-target_include_directories(cosmotd PRIVATE external/glad/include) # Not entirely sure what PRIVATE means
+target_include_directories(cosmotd PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    external/glad/include
+    external/glfw/include
+) # Not entirely sure what PRIVATE means
 
 # Specify the libraries for the linker to the target
 target_link_libraries(cosmotd PRIVATE glfw) # Not entirely sure what PRIVATE means
