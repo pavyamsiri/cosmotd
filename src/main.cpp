@@ -91,10 +91,10 @@ int main()
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     float vertices[] = {
-        0.5f, 0.5f, 0.0f, 1.0f, 1.0f,   // top right
-        0.5f, -0.5f, 0.0f, 1.0f, 0.0f,  // bottom right
-        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f, // bottom left
-        -0.5f, 0.5f, 0.0f, 0.0f, 1.0f   // top left
+        1.0f, 1.0f, 0.0f, 1.0f, 1.0f,   // top right
+        1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, // bottom left
+        -1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
     };
     uint32_t indices[] = {
         0, 1, 3, // first triangle
@@ -124,7 +124,9 @@ int main()
 
     // Generate texture
     std::default_random_engine generator;
-    std::normal_distribution<float> distribution(0.0f, 1.0f);
+    generator.seed((uint32_t)41798);
+    std::normal_distribution<float>
+        distribution(0.0f, 1.0f);
     float image[COMPUTE_HEIGHT][COMPUTE_WIDTH][4];
     for (int i = 0; i < COMPUTE_HEIGHT; i++)
     {
@@ -220,6 +222,10 @@ int main()
 
     std::cout << "BEFORE RENDER LOOP" << std::endl;
 
+    const double fpsLimit = 1.0 / 60.0;
+    double lastUpdateTime = 0; // number of seconds since the last loop
+    double lastFrameTime = 0;  // number of seconds since the last frame
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -228,29 +234,39 @@ int main()
         // -----
         processInput(window);
 
-        // // render
-        // // ------
-        // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT);
+        double now = glfwGetTime();
+        double deltaTime = now - lastUpdateTime;
 
-        glUseProgram(firstPassProgram);
-        glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        // This if-statement only executes once every 60th of a second
+        if ((now - lastFrameTime) >= fpsLimit)
+        {
+            // // render
+            // // ------
+            // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            // glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(secondPassProgram);
-        glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            glUseProgram(firstPassProgram);
+            glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        // render container
-        glUseProgram(textureProgram);
-        glBindTextureUnit(0, texture);
-        glUniform1i(glGetUniformLocation(textureProgram, "texture"), 0);
-        glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glUseProgram(secondPassProgram);
+            glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
-        glfwSwapBuffers(window);
+            // render container
+            glUseProgram(textureProgram);
+            glBindTextureUnit(0, texture);
+            glUniform1i(glGetUniformLocation(textureProgram, "texture"), 0);
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+            // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+            // -------------------------------------------------------------------------------
+            glfwSwapBuffers(window);
+
+            // only set lastFrameTime when you actually draw something
+            lastFrameTime = now;
+        }
         glfwPollEvents();
     }
 
