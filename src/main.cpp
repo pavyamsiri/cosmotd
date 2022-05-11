@@ -1,6 +1,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <shader.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 #include <string>
 #include <iostream>
@@ -51,10 +54,7 @@ int main()
 
     std::cout << "BEFORE SHADER COMPILATION" << std::endl;
 
-    // build and compile our shader zprogram
-    // ------------------------------------
-    // Shader textureShader("../src/shaders/vertex.glsl", "../src/shaders/fragment.glsl");
-    // Create vertex shader
+    // Shader
     uint32_t vertexShader;
     std::string vertexShaderCode = loadText("../src/shaders/vertex.glsl");
     const char *pVertexShaderCode = vertexShaderCode.c_str();
@@ -64,7 +64,7 @@ int main()
     checkShaderCompilation(vertexShader);
     // Create fragment shader
     uint32_t fragmentShader;
-    std::string fragmentShaderCode = loadText("../src/shaders/fragment.glsl");
+    std::string fragmentShaderCode = loadText("../src/shaders/plot_field.glsl");
     const char *pFragmentShaderCode = fragmentShaderCode.c_str();
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &pFragmentShaderCode, NULL);
@@ -226,6 +226,30 @@ int main()
     double lastUpdateTime = 0; // number of seconds since the last loop
     double lastFrameTime = 0;  // number of seconds since the last frame
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    // ImGui::StyleColorsClassic();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460");
+
+    float dx = 1.0f;
+    float dt = 0.1f;
+    float eta = 1.0f;
+    float lam = 5.0f;
+    float alpha = 2.0f;
+    float era = 1.0f;
+    bool simulate = false;
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -240,25 +264,74 @@ int main()
         // This if-statement only executes once every 60th of a second
         if ((now - lastFrameTime) >= fpsLimit)
         {
-            // // render
-            // // ------
-            // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            // glClear(GL_COLOR_BUFFER_BIT);
+            // render
+            // ------
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            {
+                ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
 
-            glUseProgram(firstPassProgram);
-            glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+                ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
 
-            glUseProgram(secondPassProgram);
-            glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+                ImGui::Text("lambda");
+                ImGui::SameLine();
+                ImGui::SliderFloat("##lam", &lam, 0.0f, 10.f); // Edit 1 float using a slider from 0.0f to 1.0f
+
+                if (simulate)
+                {
+                    if (ImGui::Button("Stop", ImVec2(50.0f, 19.0f)))
+                    {
+                        simulate = false;
+                    }
+                }
+                else
+                {
+                    if (ImGui::Button("Start", ImVec2(50.0f, 19.0f)))
+                    {
+                        simulate = true;
+                    }
+                }
+
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::End();
+            }
+
+            if (simulate)
+            {
+                glUseProgram(firstPassProgram);
+                glUniform1f(0, dx);
+                glUniform1f(1, dt);
+                glBindTextureUnit(0, texture);
+                glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
+                glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+                glUseProgram(secondPassProgram);
+                glUniform1f(0, dx);
+                glUniform1f(1, dt);
+                glUniform1f(2, eta);
+                glUniform1f(3, lam);
+                glUniform1f(4, alpha);
+                glUniform1f(5, era);
+                glBindTextureUnit(0, texture);
+                glDispatchCompute(ceil(COMPUTE_WIDTH / 8), ceil(COMPUTE_HEIGHT / 4), 1);
+                glMemoryBarrier(GL_ALL_BARRIER_BITS);
+            }
 
             // render container
             glUseProgram(textureProgram);
+            glUniform1f(0, eta);
             glBindTextureUnit(0, texture);
-            glUniform1i(glGetUniformLocation(textureProgram, "texture"), 0);
+            glUniform1i(glGetUniformLocation(textureProgram, "displayTexture"), 0);
             glBindVertexArray(VAO);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+            // Rendering
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
             // -------------------------------------------------------------------------------
@@ -269,6 +342,11 @@ int main()
         }
         glfwPollEvents();
     }
+
+    // Cleanup
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------

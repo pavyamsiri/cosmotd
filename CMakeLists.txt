@@ -15,12 +15,20 @@ add_subdirectory(external/glfw)
 add_executable(cosmotd 
     src/main.cpp
     external/glad/src/glad.c
+    external/imgui/imgui_demo.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_impl_glfw.cpp
+    external/imgui/imgui_impl_opengl3.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    external/imgui/imgui.cpp
 )
 # Add the path to the glad `include` directory to the target
 target_include_directories(cosmotd PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     external/glad/include
     external/glfw/include
+    external/imgui
 ) # Not entirely sure what PRIVATE means
 
 # Specify the libraries for the linker to the target

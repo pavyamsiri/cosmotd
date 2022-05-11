@@ -1,13 +1,13 @@
 #version 460 core
 layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
 layout(rgba32f, binding = 0) uniform image2D outTexture;
+layout(location=0) uniform float dx;
+layout(location=1) uniform float dt;
+layout(location=2) uniform float eta;
+layout(location=3) uniform float lam;
+layout(location=4) uniform float alpha;
+layout(location=5) uniform float era;
 
-float dx = 1.0f;
-float dt = 0.1f;
-float eta = 1.0f;
-float lam = 1.0f;
-float alpha = 2.0f;
-float era = 1.0f;
 
 vec4 laplacian(ivec2 pos, float dx) {
     vec4 current = imageLoad(outTexture, pos);
@@ -27,6 +27,7 @@ vec4 laplacian(ivec2 pos, float dx) {
     return result;
 
 }
+
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);

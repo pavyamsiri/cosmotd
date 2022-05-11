@@ -7,6 +7,8 @@ out vec4 fragColor;
 // texture samplers
 uniform sampler2D displayTexture;
 
+layout(location=0) uniform float eta;
+
 vec3 viridis(float t) {
 
     const vec3 c0 = vec3(0.2777273272234177, 0.005407344544966578, 0.3340998053353061);
@@ -23,7 +25,7 @@ vec3 viridis(float t) {
 
 void main()
 {
-    float maxValue = 1.1f;
+    float maxValue = min(1.1f * eta, eta + 0.1f);
 	float fieldValue = (texture(displayTexture, vTexCoord).r + maxValue) / 2;
     fragColor = vec4(viridis(fieldValue), 1.0f);
 }
