@@ -16,6 +16,7 @@ std::string loadText(const char *filePath);
 void checkShaderCompilation(uint32_t shader);
 void checkProgramLinking(uint32_t program);
 uint32_t createComputeTexture(void *data);
+uint32_t initialiseField(uint32_t height, uint32_t width, uint32_t seed);
 
 // settings
 constexpr uint32_t SCREEN_WIDTH = 800;
@@ -90,12 +91,20 @@ int main()
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
+    // Top left plot
     float vertices[] = {
-        1.0f, 1.0f, 0.0f, 1.0f, 1.0f,   // top right
-        1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
-        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, // bottom left
-        -1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
+        0.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // top right
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+        -0.6f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom left
+        -0.6f, 1.0f, 0.0f, 0.0f, 1.0f  // top left
     };
+    // // Top right plot
+    // float vertices[] = {
+    //     0.6f, 1.0f, 0.0f, 1.0f, 1.0f, // top right
+    //     0.6f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom right
+    //     0.0f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom left
+    //     0.0f, 1.0f, 0.0f, 0.0f, 1.0f  // top left
+    // };
     uint32_t indices[] = {
         0, 1, 3, // first triangle
         1, 2, 3  // second triangle
@@ -122,41 +131,9 @@ int main()
 
     std::cout << "AFTER VAO, VBO and EBO" << std::endl;
 
-    // Generate texture
-    std::default_random_engine generator;
-    generator.seed((uint32_t)41798);
-    std::normal_distribution<float>
-        distribution(0.0f, 1.0f);
-    float image[COMPUTE_HEIGHT][COMPUTE_WIDTH][4];
-    for (int i = 0; i < COMPUTE_HEIGHT; i++)
-    {
-        for (int j = 0; j < COMPUTE_WIDTH; j++)
-        {
-            float redChannel;
-            float greenChannel;
-            float blueChannel;
-            float alphaChannel;
-
-            redChannel = 0.1f * distribution(generator);
-            greenChannel = 0.0f;
-            blueChannel = 0.0f;
-            alphaChannel = 0.1f;
-
-            // RED
-            image[i][j][0] = redChannel;
-            // GREEN
-            image[i][j][1] = greenChannel;
-            // BLUE
-            image[i][j][2] = blueChannel;
-            // ALPHA
-            image[i][j][3] = alphaChannel;
-        }
-    }
-
     std::cout << "BEFORE TEXTURE CREATION" << std::endl;
 
-    // Create OpenGL texture
-    uint32_t texture = createComputeTexture(image);
+    uint32_t texture = initialiseField(COMPUTE_HEIGHT, COMPUTE_WIDTH, 478948);
 
     std::cout << "AFTER TEXTURE CREATION" << std::endl;
 
@@ -231,6 +208,7 @@ int main()
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -266,14 +244,63 @@ int main()
         {
             // render
             // ------
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             // Start the Dear ImGui frame
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
+
+            // Note: Switch this to true to enable dockspace
+            static bool dockspaceOpen = true;
+            static bool opt_fullscreen_persistant = true;
+            bool opt_fullscreen = opt_fullscreen_persistant;
+            static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+
+            // We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
+            // because it would be confusing to have two docking targets within each others.
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+            if (opt_fullscreen)
             {
-                ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+                ImGuiViewport *viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(viewport->Pos);
+                ImGui::SetNextWindowSize(viewport->Size);
+                ImGui::SetNextWindowViewport(viewport->ID);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+                window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+                window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+            }
+
+            // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole, so we ask Begin() to not render a background.
+            if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+                window_flags |= ImGuiWindowFlags_NoBackground;
+
+            // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
+            // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
+            // all active windows docked into it will lose their parent and become undocked.
+            // We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
+            // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+            ImGui::Begin("DockSpace Demo", &dockspaceOpen, window_flags);
+            ImGui::PopStyleVar();
+
+            if (opt_fullscreen)
+                ImGui::PopStyleVar(2);
+
+            // DockSpace
+            ImGuiIO &io = ImGui::GetIO();
+            ImGuiStyle &style = ImGui::GetStyle();
+            float minWinSizeX = style.WindowMinSize.x;
+            style.WindowMinSize.x = 370.0f;
+            if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+            {
+                ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+                ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+            }
+            ImGui::End();
+            {
+                ImGui::Begin("Control Panel"); // Create a window called "Hello, world!" and append into it.
 
                 ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
 
@@ -294,6 +321,54 @@ int main()
                     {
                         simulate = true;
                     }
+                }
+
+                if (ImGui::Button("Restart"))
+                {
+                    glDeleteTextures(1, &texture);
+                    texture = initialiseField(COMPUTE_HEIGHT, COMPUTE_WIDTH, 879481);
+                }
+
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::End();
+            }
+            {
+                ImGui::Begin("Viewport");
+                ImGui::BeginChild("CHILD");
+                ImGui::Text("DRAW");
+                ImGui::EndChild();
+                ImGui::End();
+            }
+
+            // Right panel
+            {
+                ImGui::Begin("Right Panel"); // Create a window called "Hello, world!" and append into it.
+
+                ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
+
+                ImGui::Text("lambda");
+                ImGui::SameLine();
+                ImGui::SliderFloat("##lam", &lam, 0.0f, 10.f); // Edit 1 float using a slider from 0.0f to 1.0f
+
+                if (simulate)
+                {
+                    if (ImGui::Button("Stop", ImVec2(50.0f, 19.0f)))
+                    {
+                        simulate = false;
+                    }
+                }
+                else
+                {
+                    if (ImGui::Button("Start", ImVec2(50.0f, 19.0f)))
+                    {
+                        simulate = true;
+                    }
+                }
+
+                if (ImGui::Button("Restart"))
+                {
+                    glDeleteTextures(1, &texture);
+                    texture = initialiseField(COMPUTE_HEIGHT, COMPUTE_WIDTH, 879481);
                 }
 
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -451,6 +526,46 @@ uint32_t createComputeTexture(void *data)
 
     glTextureStorage2D(texture, 1, GL_RGBA32F, COMPUTE_WIDTH, COMPUTE_HEIGHT);
     glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    return texture;
+}
+
+uint32_t initialiseField(uint32_t height, uint32_t width, uint32_t seed)
+{
+    float field[height][width][4];
+
+    // Generate texture
+    std::default_random_engine generator;
+    generator.seed(seed);
+    std::normal_distribution<float>
+        distribution(0.0f, 1.0f);
+
+    for (int i = 0; i < COMPUTE_HEIGHT; i++)
+    {
+        for (int j = 0; j < COMPUTE_WIDTH; j++)
+        {
+            float redChannel;
+            float greenChannel;
+            float blueChannel;
+            float alphaChannel;
+
+            redChannel = 0.1f * distribution(generator);
+            greenChannel = 0.0f;
+            blueChannel = 0.0f;
+            alphaChannel = 0.1f;
+
+            // RED
+            field[i][j][0] = redChannel;
+            // GREEN
+            field[i][j][1] = greenChannel;
+            // BLUE
+            field[i][j][2] = blueChannel;
+            // ALPHA
+            field[i][j][3] = alphaChannel;
+        }
+    }
+
+    uint32_t texture = createComputeTexture(field);
 
     return texture;
 }
