@@ -9,6 +9,8 @@
 #include <iostream>
 #include <random>
 
+// TODO: Stop reading and writing to the same image. Use two images and alternate which one is being read from and written to.
+
 void framebufferSizeCallback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
 
@@ -91,10 +93,10 @@ int main()
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
     float vertices[] = {
-        1.0f, 1.0f, 0.0f, 1.0f, 1.0f,   // top right
-        1.0f, -1.0f, 0.0f, 1.0f, 0.0f,  // bottom right
+        1.0f, 1.0f, 0.0f, 2.0f, 2.0f,   // top right
+        1.0f, -1.0f, 0.0f, 2.0f, 0.0f,  // bottom right
         -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, // bottom left
-        -1.0f, 1.0f, 0.0f, 0.0f, 1.0f   // top left
+        -1.0f, 1.0f, 0.0f, 0.0f, 2.0f   // top left
     };
     uint32_t indices[] = {
         0, 1, 3, // first triangle
