@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <shader.h>
+#include <log.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -24,7 +25,7 @@ constexpr uint32_t SCREEN_HEIGHT = 600;
 constexpr uint32_t COMPUTE_WIDTH = 200;
 constexpr uint32_t COMPUTE_HEIGHT = 200;
 
-int main()
+int main2()
 {
     // glfw: initialize and configure
     // ------------------------------
@@ -437,7 +438,7 @@ int main()
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
+void processInputCOPY(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -445,7 +446,7 @@ void processInput(GLFWwindow *window)
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebufferSizeCallback(GLFWwindow *window, int width, int height)
+void framebufferSizeCallbackCOPY(GLFWwindow *window, int width, int height)
 {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
