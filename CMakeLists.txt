@@ -32,6 +32,7 @@ add_executable(cosmotd
     src/shader.cpp
     src/shader_program.cpp
     src/buffer.cpp
+    src/framebuffer.cpp
     external/glad/src/glad.c
     external/imgui/imgui_demo.cpp
     external/imgui/imgui_draw.cpp

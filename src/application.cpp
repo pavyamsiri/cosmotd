@@ -90,15 +90,18 @@ int Application::initialise(int width, int height, const char *title, Applicatio
 
     // Vertex array
     float vertices[] = {
-        0.0f,
-        0.5f,
-        0.0f,
-        0.5f,
+        // Top
+        -0.0f,
         -0.5f,
-        0.0f,
+        -0.0f,
+        // Left
         -0.5f,
-        -0.5f,
-        0.0f,
+        +0.5f,
+        -0.0f,
+        // Right
+        +0.5f,
+        +0.8f,
+        -0.0f,
     };
 
     VertexBufferLayout layout = {{BufferElementType::FLOAT3, true}};
@@ -109,6 +112,10 @@ int Application::initialise(int width, int height, const char *title, Applicatio
     vertexArray->bindVertexBuffer(vertexBuffer);
 
     app->m_mainViewportVertexArray = vertexArray;
+
+    // Create framebuffer
+    Framebuffer *framebuffer = new Framebuffer(1920, 1080);
+    app->framebuffer = framebuffer;
 
     return 0;
 }
@@ -147,14 +154,19 @@ void Application::run()
 
 void Application::onRender()
 {
+    // Bind framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->framebufferID);
+    // TODO(Pavadol): Set this automatically from framebuffer object
+    glViewport(0, 0, 1920, 1080);
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(m_textureProgramID);
     m_mainViewportVertexArray->bind();
-    // glBindVertexArray(m_mainViewportVertexArray->arrayID);
-    // glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Application::beginImGuiFrame()
@@ -226,6 +238,7 @@ void Application::onImGuiRender()
     if (ImGui::Begin("Window2"))
     {
         ImGui::Text("HELLO 2");
+        ImGui::Image((void *)(intptr_t)framebuffer->renderTextureID, ImVec2(1080, 720));
     }
     ImGui::End();
 }

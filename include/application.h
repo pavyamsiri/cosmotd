@@ -13,6 +13,7 @@
 #include <log.h>
 #include <shader_program.h>
 #include <buffer.h>
+#include <framebuffer.h>
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -38,6 +39,7 @@ public:
 private:
     GLFWwindow *m_windowHandle = nullptr;
     ImGuiIO *m_imguiIO = nullptr;
+    Framebuffer *framebuffer = nullptr;
 
     // Timing information
     double m_lastUpdateTime = 0.0f;
