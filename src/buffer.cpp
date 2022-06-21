@@ -1,4 +1,5 @@
 #include <glad/glad.h>
+#include <intrin.h>
 
 #include <buffer.h>
 #include <log.h>
@@ -29,6 +30,55 @@ GLenum convertBufferUsageTypeToOpenGLEnum(BufferUsageType type)
     default:
         logFatal("Invalid buffer usage type!");
         // exit(-1);
+        return 0;
+    }
+}
+
+uint32_t getBufferElementTypeNumberOfRows(BufferElementType type)
+{
+    switch (type)
+    {
+    case BufferElementType::FLOAT:
+    case BufferElementType::FLOAT2:
+    case BufferElementType::FLOAT3:
+    case BufferElementType::FLOAT4:
+    case BufferElementType::DOUBLE:
+    case BufferElementType::DOUBLE2:
+    case BufferElementType::DOUBLE3:
+    case BufferElementType::DOUBLE4:
+    case BufferElementType::INT:
+    case BufferElementType::INT2:
+    case BufferElementType::INT3:
+    case BufferElementType::INT4:
+    case BufferElementType::UINT:
+    case BufferElementType::UINT2:
+    case BufferElementType::UINT3:
+    case BufferElementType::UINT4:
+        return 1;
+    case BufferElementType::FLOAT_MAT2:
+    case BufferElementType::FLOAT_MAT3X2:
+    case BufferElementType::FLOAT_MAT4X2:
+    case BufferElementType::DOUBLE_MAT2:
+    case BufferElementType::DOUBLE_MAT3X2:
+    case BufferElementType::DOUBLE_MAT4X2:
+        return 2;
+    case BufferElementType::FLOAT_MAT3:
+    case BufferElementType::FLOAT_MAT2X3:
+    case BufferElementType::FLOAT_MAT4X3:
+    case BufferElementType::DOUBLE_MAT3:
+    case BufferElementType::DOUBLE_MAT2X3:
+    case BufferElementType::DOUBLE_MAT4X3:
+        return 3;
+    case BufferElementType::FLOAT_MAT4:
+    case BufferElementType::FLOAT_MAT2X4:
+    case BufferElementType::FLOAT_MAT3X4:
+    case BufferElementType::DOUBLE_MAT4:
+    case BufferElementType::DOUBLE_MAT2X4:
+    case BufferElementType::DOUBLE_MAT3X4:
+        return 4;
+    default:
+        logFatal("Invalid buffer element type!");
+        __debugbreak();
         return 0;
     }
 }
@@ -97,6 +147,8 @@ void VertexArray::bindVertexBuffer(VertexBuffer *vertexBuffer)
 
     const VertexBufferLayout layout = vertexBuffer->layout;
     uint32_t currentOffset = 0;
+    uint32_t numCols;
+    uint32_t numRows;
 
     for (const auto &element : layout.getElements())
     {
@@ -159,10 +211,66 @@ void VertexArray::bindVertexBuffer(VertexBuffer *vertexBuffer)
             m_vertexBufferIndex++;
             currentOffset = currentOffset + element.sizeInBytes;
             break;
-        // TODO: Implement for matrices
+        case BufferElementType::FLOAT_MAT2:
+        case BufferElementType::FLOAT_MAT3:
+        case BufferElementType::FLOAT_MAT4:
+        case BufferElementType::FLOAT_MAT2X3:
+        case BufferElementType::FLOAT_MAT2X4:
+        case BufferElementType::FLOAT_MAT3X2:
+        case BufferElementType::FLOAT_MAT3X4:
+        case BufferElementType::FLOAT_MAT4X2:
+        case BufferElementType::FLOAT_MAT4X3:
+            numCols = element.numComponents;
+            numRows = getBufferElementTypeNumberOfRows(element.type);
+            // GLM matrices are column major
+            for (int i = 0; i < numCols; i++)
+            {
+                glEnableVertexAttribArray(m_vertexBufferIndex);
+                glVertexAttribPointer(
+                    m_vertexBufferIndex,
+                    numRows,
+                    GL_FLOAT,
+                    element.normalized ? GL_TRUE : GL_FALSE,
+                    layout.getStride(),
+                    (const void *)currentOffset);
+                // NOTE: I think this is used to skip ahead one attribute when indexing in order to group all matrix columns
+                // together.
+                glVertexAttribDivisor(m_vertexBufferIndex, 1);
+                m_vertexBufferIndex++;
+                // Offset by 4 bytes (float byte size) * number of rows
+                currentOffset = currentOffset + (numRows * 4);
+            }
+            break;
+        // Same algorithm as float matrices just with double as the data type
+        case BufferElementType::DOUBLE_MAT2:
+        case BufferElementType::DOUBLE_MAT3:
+        case BufferElementType::DOUBLE_MAT4:
+        case BufferElementType::DOUBLE_MAT2X3:
+        case BufferElementType::DOUBLE_MAT2X4:
+        case BufferElementType::DOUBLE_MAT3X2:
+        case BufferElementType::DOUBLE_MAT3X4:
+        case BufferElementType::DOUBLE_MAT4X2:
+        case BufferElementType::DOUBLE_MAT4X3:
+            numCols = element.numComponents;
+            numRows = getBufferElementTypeNumberOfRows(element.type);
+            for (int i = 0; i < numCols; i++)
+            {
+                glEnableVertexAttribArray(m_vertexBufferIndex);
+                glVertexAttribLPointer(
+                    m_vertexBufferIndex,
+                    numRows,
+                    GL_DOUBLE,
+                    layout.getStride(),
+                    (const void *)currentOffset);
+                glVertexAttribDivisor(m_vertexBufferIndex, 1);
+                m_vertexBufferIndex++;
+                // Offset by 8 bytes (double byte size) * number of rows
+                currentOffset = currentOffset + (numRows * 8);
+            }
+            break;
         default:
-            logFatal("These buffer elements are not currently not supported!");
-            // exit(-1);
+            logFatal("Invalid buffer element type!");
+            __debugbreak();
             break;
         }
     }

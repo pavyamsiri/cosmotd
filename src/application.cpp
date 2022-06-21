@@ -124,9 +124,9 @@ void Application::run()
         double frameDelta = now - m_lastFrameTime;
         if ((now - m_lastFrameTime) >= m_fpsLimit)
         {
-            Application::onRender();
             Application::beginImGuiFrame();
             Application::onImGuiRender();
+            Application::onRender();
             Application::endImGuiFrame();
             // Swap image buffer
             glfwSwapBuffers(m_windowHandle);
@@ -162,15 +162,70 @@ void Application::beginImGuiFrame()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    // Note: Switch this to true to enable dockspace
+    static bool dockspaceOpen = true;
+    static bool opt_fullscreen_persistent = true;
+    bool opt_fullscreen = opt_fullscreen_persistent;
+    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+
+    // Set up main docking window. This can't be docked into otherwise there can be a recursive docking relationship.
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+    // Set the docking window to take up the full screen
+    if (opt_fullscreen)
+    {
+        // Set window size to full screen
+        ImGuiViewport *viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
+        // Turn off window rounding and take off borders
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        // Remove title bar, make it uncollapsible and unresizable
+        window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
+        // Make it immovable, and unfocusable
+        window_flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+    }
+
+    // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole, so we ask Begin() to not render a background.
+    if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+        window_flags |= ImGuiWindowFlags_NoBackground;
+
+    // Dockspace window should not be padded
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::Begin("Main Dockspace", &dockspaceOpen, window_flags);
+    // Pop window style variable now that the window has been created
+    ImGui::PopStyleVar();
+
+    if (opt_fullscreen)
+        // Pop the two style variables set earlier if in full screen mode
+        ImGui::PopStyleVar(2);
+
+    // DockSpace
+    ImGuiIO &io = ImGui::GetIO();
+    ImGuiStyle &style = ImGui::GetStyle();
+    float minWinSizeX = style.WindowMinSize.x;
+    style.WindowMinSize.x = 370.0f;
+    if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+    {
+        ImGuiID dockspace_id = ImGui::GetID("Main Dockspace");
+        // Create dockspace
+        ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+    }
+    ImGui::End();
 }
 
 void Application::onImGuiRender()
 {
-    ImGui::Begin("TEST");
-    ImGui::Text("HELLO WORLD!");
-    if (ImGui ::Button("TEST"))
+    if (ImGui::Begin("Window"))
     {
-        logTrace("Trest");
+        ImGui::Text("HELLO");
+    }
+    ImGui::End();
+    if (ImGui::Begin("Window2"))
+    {
+        ImGui::Text("HELLO 2");
     }
     ImGui::End();
 }

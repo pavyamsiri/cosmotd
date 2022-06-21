@@ -1,5 +1,7 @@
 #pragma once
 
+#include <intrin.h>
+
 // #include <stdint.h>
 #include <vector>
 
@@ -44,7 +46,7 @@ enum class BufferElementType
     DOUBLE_MAT4X3,
 };
 
-static uint32_t getBufferElementTypeSize(BufferElementType type)
+static uint32_t getBufferElementTypeByteSize(BufferElementType type)
 {
     switch (type)
     {
@@ -124,6 +126,8 @@ static uint32_t getBufferElementTypeSize(BufferElementType type)
     }
 }
 
+uint32_t getBufferElementTypeNumberOfRows(BufferElementType type);
+
 struct BufferElement
 {
 public:
@@ -133,7 +137,7 @@ public:
     bool normalized;
 
     BufferElement(BufferElementType type, bool normalized)
-        : type(type), sizeInBytes(getBufferElementTypeSize(type)), normalized(normalized)
+        : type(type), sizeInBytes(getBufferElementTypeByteSize(type)), normalized(normalized)
     {
         switch (type)
         {
@@ -161,10 +165,33 @@ public:
         case BufferElementType::UINT4:
             numComponents = 4;
             break;
-        // TODO: Implement matrices
+        // Matrices only store their number of columns
+        case BufferElementType::FLOAT_MAT2:
+        case BufferElementType::FLOAT_MAT2X3:
+        case BufferElementType::FLOAT_MAT2X4:
+        case BufferElementType::DOUBLE_MAT2:
+        case BufferElementType::DOUBLE_MAT2X3:
+        case BufferElementType::DOUBLE_MAT2X4:
+            numComponents = 2;
+            break;
+        case BufferElementType::FLOAT_MAT3:
+        case BufferElementType::FLOAT_MAT3X2:
+        case BufferElementType::FLOAT_MAT3X4:
+        case BufferElementType::DOUBLE_MAT3:
+        case BufferElementType::DOUBLE_MAT3X2:
+        case BufferElementType::DOUBLE_MAT3X4:
+            numComponents = 3;
+            break;
+        case BufferElementType::FLOAT_MAT4:
+        case BufferElementType::FLOAT_MAT4X2:
+        case BufferElementType::FLOAT_MAT4X3:
+        case BufferElementType::DOUBLE_MAT4:
+        case BufferElementType::DOUBLE_MAT4X2:
+        case BufferElementType::DOUBLE_MAT4X3:
+            numComponents = 4;
         default:
-            logFatal("This buffer element type has not been implemented yet!");
-            // exit(-1);
+            logFatal("Invalid buffer element type!");
+            __debugbreak();
             break;
         }
     }
