@@ -14,6 +14,7 @@
 #include <shader_program.h>
 #include <buffer.h>
 #include <framebuffer.h>
+#include <texture.h>
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -51,6 +52,7 @@ private:
     // Rendering
     uint32_t m_textureProgramID;
     VertexArray *m_mainViewportVertexArray;
+    std::vector<Texture2D> m_fields;
 };
 
 #endif

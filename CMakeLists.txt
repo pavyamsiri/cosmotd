@@ -33,6 +33,7 @@ add_executable(cosmotd
     src/shader_program.cpp
     src/buffer.cpp
     src/framebuffer.cpp
+    src/texture.cpp
     external/glad/src/glad.c
     external/imgui/imgui_demo.cpp
     external/imgui/imgui_draw.cpp
@@ -59,3 +60,9 @@ add_custom_target(copy_shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/src/shaders ${CMAKE_CURRENT_BINARY_DIR}/shaders
 )
 add_dependencies(cosmotd copy_shaders)
+
+# Copy over data folder
+add_custom_target(copy_data
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/src/data ${CMAKE_CURRENT_BINARY_DIR}/data
+)
+add_dependencies(cosmotd copy_data)

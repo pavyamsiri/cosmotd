@@ -12,13 +12,14 @@
 #include <log.h>
 #include <application.h>
 #include <buffer.h>
+#include <texture.h>
 
 int Application::initialise(int width, int height, const char *title, Application *app)
 {
     // Initialise glfw
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     GLFWwindow *window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (window == NULL)
@@ -61,14 +62,14 @@ int Application::initialise(int width, int height, const char *title, Applicatio
     int shaderCompilationResult;
     Shader vertexShader;
     shaderCompilationResult = Shader::compileShaderFromFile(
-        "shaders/triangle_vertex.glsl", ShaderType::VERTEX_SHADER, &vertexShader);
+        "shaders/texture_vertex.glsl", ShaderType::VERTEX_SHADER, &vertexShader);
     if (shaderCompilationResult != 0)
     {
         return shaderCompilationResult;
     }
     Shader fragmentShader;
     shaderCompilationResult = Shader::compileShaderFromFile(
-        "shaders/triangle_fragment.glsl", ShaderType::FRAGMENT_SHADER, &fragmentShader);
+        "shaders/texture_fragment.glsl", ShaderType::FRAGMENT_SHADER, &fragmentShader);
     if (shaderCompilationResult != 0)
     {
         return shaderCompilationResult;
@@ -90,32 +91,49 @@ int Application::initialise(int width, int height, const char *title, Applicatio
 
     // Vertex array
     float vertices[] = {
-        // Top
-        -0.0f,
-        -0.5f,
-        -0.0f,
-        // Left
-        -0.5f,
-        +0.5f,
-        -0.0f,
-        // Right
-        +0.5f,
-        +0.8f,
-        -0.0f,
+        // Top left -  screen coordinates
+        -1.0f, +1.0f,
+        // Top left - UV
+        0.0f, 1.0f,
+
+        // Top right -  screen coordinates
+        +1.0f, +1.0f,
+        // Top right - UV
+        1.0f, 1.0f,
+
+        // Bottom left -  screen coordinates
+        -1.0f, -1.0f,
+        // Bottom left - UV
+        0.0f, 0.0f,
+
+        // Bottom right -  screen coordinates
+        1.0f, -1.0f,
+        // Bottom right - UV
+        1.0f, 0.0f};
+
+    uint32_t indices[] = {
+        1, 3, 0, // first triangle
+        3, 2, 0  // second triangle
     };
 
-    VertexBufferLayout layout = {{BufferElementType::FLOAT3, true}};
+    VertexBufferLayout layout = {{BufferElementType::FLOAT2, false}, {BufferElementType::FLOAT2, true}};
 
     VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
+    IndexBuffer *indexBuffer = new IndexBuffer(indices, 6, BufferUsageType::STATIC_DRAW);
 
     VertexArray *vertexArray = new VertexArray();
     vertexArray->bindVertexBuffer(vertexBuffer);
+    vertexArray->bindIndexBuffer(indexBuffer);
 
     app->m_mainViewportVertexArray = vertexArray;
 
     // Create framebuffer
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     app->framebuffer = framebuffer;
+
+    std::vector<Texture2D> textures = Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd");
+    logDebug("Finished loading textures");
+    app->m_fields = textures;
 
     return 0;
 }
@@ -156,15 +174,21 @@ void Application::onRender()
 {
     // Bind framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->framebufferID);
-    // TODO(Pavadol): Set this automatically from framebuffer object
+    // TODO: Set this automatically from framebuffer object
     glViewport(0, 0, 1920, 1080);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(m_textureProgramID);
+    // Bind uniforms here
+    glBindTextureUnit(0, m_fields[0].textureID);
+    glUniform1i(0, 0);
+
+    // Bind VAO
     m_mainViewportVertexArray->bind();
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    // glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -230,15 +254,22 @@ void Application::beginImGuiFrame()
 
 void Application::onImGuiRender()
 {
-    if (ImGui::Begin("Window"))
+    if (ImGui::Begin("Left Hand Window"))
     {
         ImGui::Text("HELLO");
     }
     ImGui::End();
-    if (ImGui::Begin("Window2"))
+    if (ImGui::Begin("Right hand Window"))
     {
-        ImGui::Text("HELLO 2");
-        ImGui::Image((void *)(intptr_t)framebuffer->renderTextureID, ImVec2(1080, 720));
+        ImGui::Text("HELLO");
+    }
+    ImGui::End();
+
+    if (ImGui::Begin("Main Viewport"))
+    {
+        constexpr uint32_t imageWidth = 1152;
+        constexpr uint32_t imageHeight = 1000;
+        ImGui::Image((void *)(intptr_t)framebuffer->renderTextureID, ImVec2(imageWidth, imageHeight));
     }
     ImGui::End();
 }
