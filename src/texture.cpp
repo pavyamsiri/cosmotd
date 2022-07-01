@@ -84,8 +84,10 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1] = fieldVelocity;
                     // Blue channel - field accleration
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = fieldAcceleration;
+                    // TODO: Having the alpha channel store time is pretty hacky and should be removed. It should just be a
+                    // uniform.
                     // Alpha channel - current time
-                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 3] = 1.0f;
+                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 3] = 0.1f;
                 }
             }
 

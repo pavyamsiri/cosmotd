@@ -11,17 +11,19 @@ layout(location=5) uniform float era;
 
 
 vec4 laplacian(ivec2 pos, float dx) {
+    // Need size to ensure periodic boundaries
+    ivec2 size = imageSize(inTexture);
     vec4 current = imageLoad(inTexture, pos);
     // One step
-    vec4 leftOne = imageLoad(inTexture, ivec2(pos.x - 1, pos.y));
-    vec4 rightOne = imageLoad(inTexture, ivec2(pos.x + 1, pos.y));
-    vec4 downOne = imageLoad(inTexture, ivec2(pos.x, pos.y - 1));
-    vec4 upOne = imageLoad(inTexture, ivec2(pos.x, pos.y + 1));
+    vec4 leftOne = imageLoad(inTexture, ivec2(mod(pos.x - 1, size.x), pos.y));
+    vec4 rightOne = imageLoad(inTexture, ivec2(mod(pos.x + 1, size.x), pos.y));
+    vec4 downOne = imageLoad(inTexture, ivec2(pos.x, mod(pos.y - 1, size.y)));
+    vec4 upOne = imageLoad(inTexture, ivec2(pos.x, mod(pos.y + 1, size.y)));
     // Two steps
-    vec4 leftTwo = imageLoad(inTexture, ivec2(pos.x - 2, pos.y));
-    vec4 rightTwo = imageLoad(inTexture, ivec2(pos.x + 2, pos.y));
-    vec4 downTwo = imageLoad(inTexture, ivec2(pos.x, pos.y - 2));
-    vec4 upTwo = imageLoad(inTexture, ivec2(pos.x, pos.y + 2));
+    vec4 leftTwo = imageLoad(inTexture, ivec2(mod(pos.x - 2, size.x), pos.y));
+    vec4 rightTwo = imageLoad(inTexture, ivec2(mod(pos.x + 2, size.x), pos.y));
+    vec4 downTwo = imageLoad(inTexture, ivec2(pos.x, mod(pos.y - 2, size.y)));
+    vec4 upTwo = imageLoad(inTexture, ivec2(pos.x, mod(pos.y + 2, size.y)));
 
     vec4 result = 1/(12 * dx * dx) * (-60 * current + 16 * (leftOne + rightOne + downOne + upOne) - 1 * (leftTwo + rightTwo + downTwo + upTwo));
 
