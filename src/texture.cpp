@@ -17,11 +17,16 @@ Texture2D::Texture2D()
     // Set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    std::stringstream debugStream;
+    debugStream << "2D texture created with ID " << textureID;
+    logDebug(debugStream.str().c_str());
 }
 
 Texture2D::~Texture2D()
 {
-    logTrace("Deleting 2D texture...");
+    std::stringstream traceStream;
+    traceStream << "Deleting 2D texture with ID " << textureID;
+    logDebug(traceStream.str().c_str());
     glDeleteTextures(1, &textureID);
 }
 
@@ -109,4 +114,25 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
         return std::vector<std::shared_ptr<Texture2D>>();
     }
+}
+
+std::vector<std::shared_ptr<Texture2D>> Texture2D::createTextures(uint32_t width, uint32_t height, uint32_t size)
+{
+    std::vector<std::shared_ptr<Texture2D>> fields(size);
+    for (int fieldIndex = 0; fieldIndex < size; fieldIndex++)
+    {
+        fields[fieldIndex] = std::shared_ptr<Texture2D>(new Texture2D());
+        fields[fieldIndex]->width = width;
+        fields[fieldIndex]->height = height;
+
+        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex]->textureID);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTextureStorage2D(fields[fieldIndex]->textureID, 1, GL_RGBA32F, width, height);
+        glBindImageTexture(0, fields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    }
+
+    return fields;
 }

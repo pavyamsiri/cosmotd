@@ -34,6 +34,7 @@ VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, S
         return;
     }
 
+    logDebug("Creating vertex/fragment shader program...");
     programID = glCreateProgram();
     // Attach shaders
     glAttachShader(programID, vertexShader->shaderID);
@@ -45,6 +46,9 @@ VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, S
     // Link success
     if (linkResult == 0)
     {
+        std::stringstream debugStream;
+        debugStream << "Vertex/fragment shader program created with ID " << programID;
+        logDebug(debugStream.str().c_str());
         isInitialised = true;
     }
 }
@@ -69,6 +73,7 @@ ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
         return;
     }
 
+    logDebug("Creating compute shader program...");
     programID = glCreateProgram();
     // Attach shaders
     glAttachShader(programID, computeShader->shaderID);
@@ -79,6 +84,9 @@ ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
     // Link success
     if (linkResult == 0)
     {
+        std::stringstream debugStream;
+        debugStream << "Compute shader program created with ID " << programID;
+        logDebug(debugStream.str().c_str());
         isInitialised = true;
     }
 }

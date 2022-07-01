@@ -7,8 +7,8 @@ layout(location = 0) in vec2 inTextureCoordinate;
 layout (location = 0) out vec4 outColor;
 
 // Uniforms
-layout (binding = 0) uniform sampler2D displayTexture;
-layout(location = 0) uniform float eta;
+layout (binding = 0) uniform sampler2D uniSampler;
+layout (location = 0) uniform float eta;
 
 vec3 viridis(float t) {
 
@@ -27,6 +27,6 @@ vec3 viridis(float t) {
 void main()
 {
     float maxValue = min(1.1f * eta, eta + 0.1f);
-	float fieldValue = (texture(displayTexture, inTextureCoordinate).r + maxValue) / 2;
+	float fieldValue = (texture(uniSampler, inTextureCoordinate).r + maxValue) / 2;
     outColor = vec4(viridis(fieldValue), 1.0f);
 }

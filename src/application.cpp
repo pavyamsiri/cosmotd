@@ -85,8 +85,19 @@ Application::Application(int width, int height, const char *title)
     // Set up compute shader
     Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    if (!firstComputeProgram->isInitialised)
+    {
+        return;
+    }
     Shader *secondComputeShader = new Shader("shaders/evolve_velocity_acceleration.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+    if (!secondComputeProgram->isInitialised)
+    {
+        return;
+    }
+
+    delete firstComputeShader;
+    delete secondComputeShader;
 
     this->m_textureProgram = textureProgram;
     this->m_firstComputeProgram = firstComputeProgram;
@@ -134,8 +145,10 @@ Application::Application(int width, int height, const char *title)
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     this->m_framebuffer = framebuffer;
 
-    std::vector<std::shared_ptr<Texture2D>> textures = Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd");
+    std::vector<std::shared_ptr<Texture2D>> textures = Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd");
     this->m_fields = textures;
+    std::vector<std::shared_ptr<Texture2D>> copyTextures = Texture2D::createTextures(textures[0]->width, textures[0]->height, textures.size());
+    this->m_copyfields = copyTextures;
 
     // Initialisation complete
     this->isInitialised = true;
@@ -209,7 +222,6 @@ void Application::onRender()
     static float lam = 5.0f;
     static float alpha = 2.0f;
     static float era = 1.0f;
-    static uint32_t fieldSwitch = 0;
 
     // Bind framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer->framebufferID);
@@ -218,14 +230,26 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    glUseProgram(0);
     m_firstComputeProgram->use();
     glUniform1f(0, dx);
     glUniform1f(1, dt);
-    m_fields[fieldSwitch % 2]->bind(0);
-    m_fields[(fieldSwitch + 1) % 2]->bind(1);
-    glDispatchCompute(ceil(200 / 8), ceil(200 / 4), 1);
+    if (pingpong)
+    {
+        glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    }
+    else
+    {
+        glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    }
+    glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
+    pingpong = !pingpong;
+
+    glUseProgram(0);
     m_secondComputeProgram->use();
     glUniform1f(0, dx);
     glUniform1f(1, dt);
@@ -233,23 +257,38 @@ void Application::onRender()
     glUniform1f(3, lam);
     glUniform1f(4, alpha);
     glUniform1f(5, era);
-    m_fields[fieldSwitch % 2]->bind(0);
-    m_fields[(fieldSwitch + 1) % 2]->bind(1);
-    glDispatchCompute(ceil(200 / 8), ceil(200 / 4), 1);
+    if (!pingpong)
+    {
+        glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    }
+    else
+    {
+        glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    }
+    glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    pingpong = !pingpong;
 
     m_textureProgram->use();
     // Bind uniforms here
-    m_fields[0]->bind(0);
-    // m_fields[fieldSwitch % 2]->bind(0);
+    glUniform1f(0, eta);
+    if (pingpong)
+    {
+        m_fields[0]->bind(0);
+    }
+    else
+    {
+        m_copyfields[0]->bind(0);
+    }
 
     // Bind VAO
     m_mainViewportVertexArray->bind();
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    fieldSwitch++;
 }
 
 void Application::beginImGuiFrame()
@@ -314,20 +353,20 @@ void Application::beginImGuiFrame()
 
 void Application::onImGuiRender()
 {
-    if (ImGui::Begin("Left Hand Window", nullptr, ImGuiWindowFlags_NoMove))
+    if (ImGui::Begin("Left Hand Window"))
     {
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_imguiIO->Framerate, m_imguiIO->Framerate);
     }
     ImGui::End();
-    if (ImGui::Begin("Right hand Window", nullptr, ImGuiWindowFlags_NoMove))
+    if (ImGui::Begin("Right hand Window"))
     {
         ImGui::Text("HELLO");
+        ImGui::SliderInt("Swap fields", &swapFields, 0, 3);
+        // ImGui::Checkbox("Pingpong", &pingpong);
     }
     ImGui::End();
 
-    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove;
-
-    if (ImGui::Begin("Main Viewport", nullptr, windowFlags))
+    if (ImGui::Begin("Main Viewport", nullptr, ImGuiWindowFlags_NoScrollbar))
     {
         constexpr uint32_t imageWidth = 1176;
         constexpr uint32_t imageHeight = 1003;
