@@ -1,6 +1,10 @@
-#include <log.h>
+// Standard libraries
 #include <iostream>
 
+// Internal libraries
+#include <log.h>
+
+// Windows implemnentation with colored output
 #ifdef _WIN32
 #include <windows.h>
 #include <wincon.h>
@@ -80,9 +84,11 @@ void logFatal(const char *message)
     SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
     std::cout << tag << message << std::endl;
     SetConsoleTextAttribute(hConsole, 7);
+    __debugbreak();
 #endif
 }
 
+// Non-windows implementations
 #elif
 void logTrace(const char *message)
 {
@@ -134,6 +140,7 @@ void logFatal(const char *message)
 
     const char *tag = "[ FATAL ]: ";
     std::cout << tag << message << std::endl;
+    __debugbreak();
 #endif
 }
 

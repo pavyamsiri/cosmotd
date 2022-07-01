@@ -20,55 +20,76 @@ int validateShaderProgramLinking(uint32_t programID)
     return 0;
 }
 
-int ShaderProgram::linkVertexFragmentProgram(Shader vertexShader, Shader fragmentShader, uint32_t *programID)
+VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, Shader *fragmentShader)
 {
     // Validate shader types
-    if (vertexShader.type != ShaderType::VERTEX_SHADER)
+    if (vertexShader->type != ShaderType::VERTEX_SHADER)
     {
         logError("The given vertex shader is not a vertex shader!");
-        return -1;
+        return;
     }
-    if (fragmentShader.type != ShaderType::FRAGMENT_SHADER)
+    if (fragmentShader->type != ShaderType::FRAGMENT_SHADER)
     {
         logError("The given fragment shader is not a fragment shader!");
-        return -1;
+        return;
     }
 
-    *programID = glCreateProgram();
+    programID = glCreateProgram();
     // Attach shaders
-    glAttachShader(*programID, vertexShader.shaderID);
-    glAttachShader(*programID, fragmentShader.shaderID);
+    glAttachShader(programID, vertexShader->shaderID);
+    glAttachShader(programID, fragmentShader->shaderID);
     // Link program
-    glLinkProgram(*programID);
+    glLinkProgram(programID);
     int linkResult;
-    linkResult = validateShaderProgramLinking(*programID);
-    if (linkResult != 0)
+    linkResult = validateShaderProgramLinking(programID);
+    // Link success
+    if (linkResult == 0)
     {
-        return linkResult;
+        isInitialised = true;
     }
-    return 0;
 }
 
-int ShaderProgram::linkComputeProgram(Shader computeShader, uint32_t *programID)
+VertexFragmentShaderProgram::~VertexFragmentShaderProgram()
+{
+    glDeleteProgram(programID);
+    logTrace("Vertex/Fragment shader program deleted.");
+}
+
+void VertexFragmentShaderProgram::use()
+{
+    glUseProgram(programID);
+}
+
+ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
 {
     // Validate shader types
-    if (computeShader.type != ShaderType::COMPUTE_SHADER)
+    if (computeShader->type != ShaderType::COMPUTE_SHADER)
     {
         logError("The given compute shader is not a compute shader!");
-        return -1;
+        return;
     }
 
-    *programID = glCreateProgram();
+    programID = glCreateProgram();
     // Attach shaders
-    glAttachShader(*programID, computeShader.shaderID);
+    glAttachShader(programID, computeShader->shaderID);
     // Link program
-    glLinkProgram(*programID);
+    glLinkProgram(programID);
     int linkResult;
-    linkResult = validateShaderProgramLinking(*programID);
-    if (linkResult != 0)
+    linkResult = validateShaderProgramLinking(programID);
+    // Link success
+    if (linkResult == 0)
     {
-        return linkResult;
+        isInitialised = true;
     }
+}
 
-    return 0;
+ComputeShaderProgram::~ComputeShaderProgram()
+{
+    glDeleteProgram(programID);
+    logTrace("Compute shader program deleted.");
+}
+
+void ComputeShaderProgram::use()
+{
+    glUseProgram(programID);
 }

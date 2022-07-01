@@ -9,10 +9,10 @@
 #include <imgui_impl_opengl3.h>
 
 // Internal libraries
-#include <log.h>
-#include <application.h>
-#include <shader.h>
-#include <shader_program.h>
+#include "application.h"
+#include "log.h"
+#include "shader.h"
+#include "shader_program.h"
 
 // Constants
 constexpr uint32_t SCREEN_WIDTH = 800;
@@ -21,22 +21,16 @@ constexpr const char *APPLICATION_TITLE = "Cosmological Topological Defects";
 
 int main()
 {
-    Application app;
-    logDebug("Before initialisation!");
-
-    int initialisationResult = Application::initialise(SCREEN_WIDTH, SCREEN_HEIGHT, APPLICATION_TITLE, &app);
-    if (initialisationResult != 0)
+    Application *app = new Application(SCREEN_WIDTH, SCREEN_HEIGHT, APPLICATION_TITLE);
+    if (!app->isInitialised)
     {
-        return initialisationResult;
+        logFatal("Failed to initialise application!");
+        return -1;
     }
 
-    // Set up vertex data
+    app->run();
 
-    app.run();
+    delete app;
 
-    app.cleanup();
-
-    // Return
-    logTrace("FINISHED EXECUTION");
     return 0;
 }

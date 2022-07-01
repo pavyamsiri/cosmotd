@@ -1,9 +1,13 @@
-#include <glad/glad.h>
+// Standard libraries
 #include <intrin.h>
 
-#include <buffer.h>
-#include <log.h>
+// External libraries
+#include <glad/glad.h>
 #include <sstream>
+
+// Internal libraries
+#include "buffer.h"
+#include "log.h"
 
 GLenum convertBufferUsageTypeToOpenGLEnum(BufferUsageType type)
 {
@@ -28,8 +32,7 @@ GLenum convertBufferUsageTypeToOpenGLEnum(BufferUsageType type)
     case BufferUsageType::DYNAMIC_COPY:
         return GL_DYNAMIC_COPY;
     default:
-        logFatal("Invalid buffer usage type!");
-        // exit(-1);
+        logError("Invalid buffer usage type!");
         return 0;
     }
 }
@@ -77,56 +80,62 @@ uint32_t getBufferElementTypeNumberOfRows(BufferElementType type)
     case BufferElementType::DOUBLE_MAT3X4:
         return 4;
     default:
-        logFatal("Invalid buffer element type!");
-        __debugbreak();
+        logError("Invalid buffer element type!");
         return 0;
     }
 }
 
 VertexBuffer::VertexBuffer(void *vertices, uint32_t size, BufferUsageType usageType, VertexBufferLayout layout) : layout(layout)
 {
-    logTrace("Vertex buffer created!.");
+    logTrace("Creating vertex buffer...");
     glGenBuffers(1, &bufferID);
     glBindBuffer(GL_ARRAY_BUFFER, bufferID);
     glBufferData(GL_ARRAY_BUFFER, size, vertices, convertBufferUsageTypeToOpenGLEnum(usageType));
+    logTrace("Vertex buffer creation complete.");
 }
 
 VertexBuffer::~VertexBuffer()
 {
-    logTrace("Vertex buffer deleted.");
+    logTrace("Deleting vertex buffer...");
     glDeleteBuffers(1, &bufferID);
 }
 
 void VertexBuffer::bind() const
 {
+    logTrace("Binding vertex buffer...");
     glBindBuffer(GL_ARRAY_BUFFER, bufferID);
 }
 
 void VertexBuffer::unbind() const
 {
+    logTrace("Unbinding vertex buffer...");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 IndexBuffer::IndexBuffer(uint32_t *indices, uint32_t count, BufferUsageType usageType)
 {
+    logTrace("Creating index buffer...");
     glGenBuffers(1, &bufferID);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(uint32_t), indices, convertBufferUsageTypeToOpenGLEnum(usageType));
+    logTrace("Index buffer creation complete.");
 }
 
 IndexBuffer::~IndexBuffer()
 {
-    logTrace("Index buffer deleted.");
+    logTrace("Deleting index buffer...");
     glDeleteBuffers(1, &bufferID);
 }
 
 void IndexBuffer::bind() const
 {
+    logTrace("Binding index buffer...");
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
 }
 
 void IndexBuffer::unbind() const
 {
+    logTrace("Unbinding index buffer...");
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
@@ -137,11 +146,13 @@ VertexArray::VertexArray()
 
 VertexArray::~VertexArray()
 {
+    logTrace("Deleting vertex array...");
     glDeleteVertexArrays(1, &arrayID);
 }
 
 void VertexArray::bindVertexBuffer(VertexBuffer *vertexBuffer)
 {
+    logTrace("Binding vertex buffer to vertex array...");
     glBindVertexArray(arrayID);
     vertexBuffer->bind();
 
@@ -269,8 +280,7 @@ void VertexArray::bindVertexBuffer(VertexBuffer *vertexBuffer)
             }
             break;
         default:
-            logFatal("Invalid buffer element type!");
-            __debugbreak();
+            logError("Invalid buffer element type!");
             break;
         }
     }
@@ -278,6 +288,7 @@ void VertexArray::bindVertexBuffer(VertexBuffer *vertexBuffer)
 
 void VertexArray::bindIndexBuffer(IndexBuffer *indexBuffer)
 {
+    logTrace("Binding index buffer to vertex array...");
     glBindVertexArray(arrayID);
     indexBuffer->bind();
 }
@@ -288,5 +299,6 @@ void VertexArray::bind() const
 }
 void VertexArray::unbind() const
 {
+    logTrace("Unbinding vertex array...");
     glBindVertexArray(0);
 }

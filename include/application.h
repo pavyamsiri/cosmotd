@@ -22,8 +22,13 @@ void processInput(GLFWwindow *window);
 class Application
 {
 public:
-    // Methods
-    static int initialise(int width, int height, const char *title, Application *app);
+    // Flag that signals that the application has been initialised correctly.
+    bool isInitialised = false;
+
+    // Constructor
+    Application(int width, int height, const char *title);
+    ~Application();
+
     // Run loop
     void run();
     // Render method
@@ -34,13 +39,11 @@ public:
     void endImGuiFrame();
     // Update method (frame rate independent)
     void onUpdate();
-    // Clean up resources
-    void cleanup();
 
 private:
     GLFWwindow *m_windowHandle = nullptr;
     ImGuiIO *m_imguiIO = nullptr;
-    Framebuffer *framebuffer = nullptr;
+    Framebuffer *m_framebuffer = nullptr;
 
     // Timing information
     double m_lastUpdateTime = 0.0f;
@@ -50,9 +53,14 @@ private:
     double m_fpsLimit = 1.0f / 60.0f;
 
     // Rendering
-    uint32_t m_textureProgramID;
+    VertexFragmentShaderProgram *m_textureProgram;
     VertexArray *m_mainViewportVertexArray;
-    std::vector<Texture2D> m_fields;
+    // TODO: This should be paired with a compute program (multiple pass shader program)
+    std::vector<std::shared_ptr<Texture2D>> m_fields;
+
+    // Compute shader
+    ComputeShaderProgram *m_firstComputeProgram;
+    ComputeShaderProgram *m_secondComputeProgram;
 };
 
 #endif

@@ -56,8 +56,9 @@ int validateShaderCompilation(uint32_t shaderID)
     }
 }
 
-int Shader::compileShaderFromFile(const char *shaderPath, ShaderType type, Shader *shader)
+Shader::Shader(const char *shaderPath, ShaderType type) : type(type)
 {
+    logTrace("Compiling shader from file...");
     std::string shaderCode;
     std::ifstream shaderFile;
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -78,12 +79,10 @@ int Shader::compileShaderFromFile(const char *shaderPath, ShaderType type, Shade
         std::stringstream errorStream;
         errorStream << "Failed to read " << convertShaderTypeToString(type) << " from file! - " << e.what();
         logError(errorStream.str().c_str());
-        return -1;
+        return;
     }
 
     const char *csShaderCode = shaderCode.c_str();
-
-    uint32_t shaderID;
 
     int glShaderType;
     try
@@ -93,7 +92,7 @@ int Shader::compileShaderFromFile(const char *shaderPath, ShaderType type, Shade
     catch (const std::bad_optional_access &e)
     {
         logError("Invalid shader type!");
-        return -1;
+        return;
     }
 
     shaderID = glCreateShader(glShaderType);
@@ -106,16 +105,18 @@ int Shader::compileShaderFromFile(const char *shaderPath, ShaderType type, Shade
     if (compilationResult != 0)
     {
         glDeleteShader(shaderID);
-        return compilationResult;
+        return;
     }
 
-    // Link shader to the compiled shader ID
-    shader->shaderID = shaderID;
-    shader->type = type;
-    return 0;
+    // Initialisation complete
+    this->isInitialised = true;
+
+    logTrace("Shader initialised successfully!");
+    return;
 }
 
-void Shader::deleteShader()
+Shader::~Shader()
 {
-    glDeleteShader(shaderID);
+    glDeleteShader(this->shaderID);
+    logTrace("Shader deleted.");
 }

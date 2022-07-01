@@ -1,13 +1,14 @@
 #version 460 core
 
-in vec2 vTexCoord;
+// Vertex shader inputs
+layout(location = 0) in vec2 inTextureCoordinate;
 
-out vec4 fragColor;
+// Fragment shader outputs
+layout (location = 0) out vec4 outColor;
 
-// texture samplers
-uniform sampler2D displayTexture;
-
-layout(location=0) uniform float eta;
+// Uniforms
+layout (binding = 0) uniform sampler2D displayTexture;
+layout(location = 0) uniform float eta;
 
 vec3 viridis(float t) {
 
@@ -26,6 +27,6 @@ vec3 viridis(float t) {
 void main()
 {
     float maxValue = min(1.1f * eta, eta + 0.1f);
-	float fieldValue = (texture(displayTexture, vTexCoord).r + maxValue) / 2;
-    fragColor = vec4(viridis(fieldValue), 1.0f);
+	float fieldValue = (texture(displayTexture, inTextureCoordinate).r + maxValue) / 2;
+    outColor = vec4(viridis(fieldValue), 1.0f);
 }

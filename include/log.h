@@ -1,7 +1,13 @@
-#ifndef LOG_H
-#define LOG_H
+#pragma once
+
+// Standard libraries
 #include <iostream>
+#include <sstream>
 #include <time.h>
+
+// External libraries
+
+// Internal libraries
 
 enum class LogLevel
 {
@@ -19,5 +25,3 @@ void logInfo(const char *message);
 void logWarning(const char *message);
 void logError(const char *message);
 void logFatal(const char *message);
-
-#endif

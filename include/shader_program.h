@@ -1,9 +1,26 @@
 #pragma once
 #include <shader.h>
 
-namespace ShaderProgram
+class VertexFragmentShaderProgram
 {
+public:
+    uint32_t programID;
+    bool isInitialised = false;
 
-    int linkVertexFragmentProgram(Shader vertexShader, Shader fragmentShader, uint32_t *programID);
-    int linkComputeProgram(Shader computeShader, uint32_t *programID);
-}
+    VertexFragmentShaderProgram(Shader *vertexShader, Shader *fragmentShader);
+    ~VertexFragmentShaderProgram();
+
+    void use();
+};
+
+class ComputeShaderProgram
+{
+public:
+    uint32_t programID;
+    bool isInitialised = false;
+
+    ComputeShaderProgram(Shader *computeShader);
+    ~ComputeShaderProgram();
+
+    void use();
+};

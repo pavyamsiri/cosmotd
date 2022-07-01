@@ -9,43 +9,45 @@
 #include <imgui_impl_opengl3.h>
 
 // Internal libraries
-#include <log.h>
-#include <application.h>
-#include <buffer.h>
-#include <texture.h>
+#include "application.h"
+#include "buffer.h"
+#include "log.h"
+#include "texture.h"
 
-int Application::initialise(int width, int height, const char *title, Application *app)
+Application::Application(int width, int height, const char *title)
 {
-    // Initialise glfw
+    logDebug("Initialising application...");
+    // Initialise glfw and specify OpenGL version
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // Create glfw window
     GLFWwindow *window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (window == NULL)
     {
-        logFatal("Failed to create GLFW window");
         glfwTerminate();
-        return -1;
+        logFatal("Failed to create GLFW window.");
+        return;
     }
     glfwMakeContextCurrent(window);
+
+    // Set resize callback
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
     // Initialise OpenGL via GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         logFatal("Failed to initialise GLAD");
-        return -1;
+        return;
     }
 
     // Set up ImGUI
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
+    // (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -54,40 +56,41 @@ int Application::initialise(int width, int height, const char *title, Applicatio
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
-    app->m_windowHandle = window;
-    app->m_imguiIO = &io;
+    this->m_windowHandle = window;
+    this->m_imguiIO = &io;
 
     // Set up shaders
     // 1. Load text from file
-    int shaderCompilationResult;
-    Shader vertexShader;
-    shaderCompilationResult = Shader::compileShaderFromFile(
-        "shaders/texture_vertex.glsl", ShaderType::VERTEX_SHADER, &vertexShader);
-    if (shaderCompilationResult != 0)
+    Shader *vertexShader = new Shader("shaders/texture_vertex.glsl", ShaderType::VERTEX_SHADER);
+    if (!vertexShader->isInitialised)
     {
-        return shaderCompilationResult;
+        return;
     }
-    Shader fragmentShader;
-    shaderCompilationResult = Shader::compileShaderFromFile(
-        "shaders/texture_fragment.glsl", ShaderType::FRAGMENT_SHADER, &fragmentShader);
-    if (shaderCompilationResult != 0)
+    Shader *fragmentShader = new Shader("shaders/plot_field.glsl", ShaderType::FRAGMENT_SHADER);
+    if (!fragmentShader->isInitialised)
     {
-        return shaderCompilationResult;
+        return;
     }
     // 2. Create shader program
     int programLinkingResult;
-    uint32_t textureProgramID;
-    programLinkingResult = ShaderProgram::linkVertexFragmentProgram(vertexShader, fragmentShader, &textureProgramID);
-    if (programLinkingResult != 0)
+    VertexFragmentShaderProgram *textureProgram = new VertexFragmentShaderProgram(vertexShader, fragmentShader);
+    if (!textureProgram->isInitialised)
     {
-        return programLinkingResult;
+        return;
     }
 
-    // NOTE: Need to delete shader after linking to program?
-    vertexShader.deleteShader();
-    fragmentShader.deleteShader();
+    delete vertexShader;
+    delete fragmentShader;
 
-    app->m_textureProgramID = textureProgramID;
+    // Set up compute shader
+    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    Shader *secondComputeShader = new Shader("shaders/evolve_velocity_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+
+    this->m_textureProgram = textureProgram;
+    this->m_firstComputeProgram = firstComputeProgram;
+    this->m_secondComputeProgram = secondComputeProgram;
 
     // Vertex array
     float vertices[] = {
@@ -125,34 +128,60 @@ int Application::initialise(int width, int height, const char *title, Applicatio
     vertexArray->bindVertexBuffer(vertexBuffer);
     vertexArray->bindIndexBuffer(indexBuffer);
 
-    app->m_mainViewportVertexArray = vertexArray;
+    this->m_mainViewportVertexArray = vertexArray;
 
     // Create framebuffer
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
-    app->framebuffer = framebuffer;
+    this->m_framebuffer = framebuffer;
 
-    std::vector<Texture2D> textures = Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd");
-    logDebug("Finished loading textures");
-    app->m_fields = textures;
+    std::vector<std::shared_ptr<Texture2D>> textures = Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd");
+    this->m_fields = textures;
 
-    return 0;
+    // Initialisation complete
+    this->isInitialised = true;
+    logDebug("Application initialisation completed successfully!");
+
+    return;
+}
+
+Application::~Application()
+{
+    logDebug("Cleaning up application...");
+    // Clean up
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    // De-allocate
+    delete m_textureProgram;
+    delete m_mainViewportVertexArray;
+    m_fields.clear();
+
+    // Terminate
+    glfwTerminate();
+
+    logDebug("Application cleanup completed successfully!");
 }
 
 void Application::run()
 {
+    // Application loop
     while (!glfwWindowShouldClose(m_windowHandle))
     {
+        // Handle input
         processInput(m_windowHandle);
-        // 1. Frame rate limited loop
+        // 1. Frame rate limited update
         double now = glfwGetTime();
         double updateDelta = now - m_lastUpdateTime;
         double frameDelta = now - m_lastFrameTime;
         if ((now - m_lastFrameTime) >= m_fpsLimit)
         {
+            // UI rendering
             Application::beginImGuiFrame();
             Application::onImGuiRender();
-            Application::onRender();
             Application::endImGuiFrame();
+            // Scene rendering
+            Application::onRender();
             // Swap image buffer
             glfwSwapBuffers(m_windowHandle);
 
@@ -160,9 +189,10 @@ void Application::run()
             m_lastFrameTime = now;
         }
 
+        // 2. Frame rate unlimited update
         Application::onUpdate();
 
-        // 2. ASAP loop
+        // Poll events
         glfwPollEvents();
 
         // Update time of last
@@ -172,25 +202,54 @@ void Application::run()
 
 void Application::onRender()
 {
+    // Compute pass
+    static float dx = 1.0f;
+    static float dt = 0.1f;
+    static float eta = 1.0f;
+    static float lam = 5.0f;
+    static float alpha = 2.0f;
+    static float era = 1.0f;
+    static uint32_t fieldSwitch = 0;
+
     // Bind framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->framebufferID);
-    // TODO: Set this automatically from framebuffer object
-    glViewport(0, 0, 1920, 1080);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer->framebufferID);
+    glViewport(0, 0, m_framebuffer->width, m_framebuffer->height);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(m_textureProgramID);
+    m_firstComputeProgram->use();
+    glUniform1f(0, dx);
+    glUniform1f(1, dt);
+    m_fields[fieldSwitch % 2]->bind(0);
+    m_fields[(fieldSwitch + 1) % 2]->bind(1);
+    glDispatchCompute(ceil(200 / 8), ceil(200 / 4), 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    m_secondComputeProgram->use();
+    glUniform1f(0, dx);
+    glUniform1f(1, dt);
+    glUniform1f(2, eta);
+    glUniform1f(3, lam);
+    glUniform1f(4, alpha);
+    glUniform1f(5, era);
+    m_fields[fieldSwitch % 2]->bind(0);
+    m_fields[(fieldSwitch + 1) % 2]->bind(1);
+    glDispatchCompute(ceil(200 / 8), ceil(200 / 4), 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    m_textureProgram->use();
     // Bind uniforms here
-    glBindTextureUnit(0, m_fields[0].textureID);
-    glUniform1i(0, 0);
+    m_fields[0]->bind(0);
+    // m_fields[fieldSwitch % 2]->bind(0);
 
     // Bind VAO
     m_mainViewportVertexArray->bind();
-    // glDrawArrays(GL_TRIANGLES, 0, 3);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    fieldSwitch++;
 }
 
 void Application::beginImGuiFrame()
@@ -224,7 +283,8 @@ void Application::beginImGuiFrame()
         window_flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
     }
 
-    // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole, so we ask Begin() to not render a background.
+    // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole,
+    // so we ask Begin() to not render a background.
     if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
         window_flags |= ImGuiWindowFlags_NoBackground;
 
@@ -254,48 +314,37 @@ void Application::beginImGuiFrame()
 
 void Application::onImGuiRender()
 {
-    if (ImGui::Begin("Left Hand Window"))
+    if (ImGui::Begin("Left Hand Window", nullptr, ImGuiWindowFlags_NoMove))
     {
-        ImGui::Text("HELLO");
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_imguiIO->Framerate, m_imguiIO->Framerate);
     }
     ImGui::End();
-    if (ImGui::Begin("Right hand Window"))
+    if (ImGui::Begin("Right hand Window", nullptr, ImGuiWindowFlags_NoMove))
     {
         ImGui::Text("HELLO");
     }
     ImGui::End();
 
-    if (ImGui::Begin("Main Viewport"))
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoMove;
+
+    if (ImGui::Begin("Main Viewport", nullptr, windowFlags))
     {
-        constexpr uint32_t imageWidth = 1152;
-        constexpr uint32_t imageHeight = 1000;
-        ImGui::Image((void *)(intptr_t)framebuffer->renderTextureID, ImVec2(imageWidth, imageHeight));
+        constexpr uint32_t imageWidth = 1176;
+        constexpr uint32_t imageHeight = 1003;
+        constexpr ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
+        ImGui::Image((void *)(intptr_t)m_framebuffer->renderTextureID, imageSize);
     }
     ImGui::End();
 }
 
 void Application::endImGuiFrame()
 {
-    // ImGUI rendering
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 void Application::onUpdate()
 {
-}
-
-void Application::cleanup()
-{
-    // Clean up
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-
-    // De-allocate
-
-    // Terminate
-    glfwTerminate();
 }
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height)

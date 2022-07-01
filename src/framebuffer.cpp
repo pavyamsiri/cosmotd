@@ -3,7 +3,7 @@
 #include <intrin.h>
 #include <log.h>
 
-Framebuffer::Framebuffer(uint32_t width, uint32_t height)
+Framebuffer::Framebuffer(uint32_t width, uint32_t height) : width(width), height(height)
 {
     // Generate and bind framebuffer
     glGenFramebuffers(1, &framebufferID);
@@ -20,7 +20,7 @@ Framebuffer::Framebuffer(uint32_t width, uint32_t height)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    // Set renderTexture as color attachment 9
+    // Set renderTexture as color attachment 0
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, renderTextureID, 0);
 
     // Use color attachment 0 to draw
@@ -30,8 +30,11 @@ Framebuffer::Framebuffer(uint32_t width, uint32_t height)
     // Check that framebuffer creation was successful
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
     {
-        logFatal("Failed to create framebuffer!");
-        __debugbreak();
+        logError("Failed to create framebuffer!");
+    }
+    else
+    {
+        isInitialised = true;
     }
 }
 

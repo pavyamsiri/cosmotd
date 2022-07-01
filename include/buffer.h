@@ -119,9 +119,7 @@ static uint32_t getBufferElementTypeByteSize(BufferElementType type)
     case BufferElementType::DOUBLE_MAT4X3:
         return 4 * 3 * 8;
     default:
-        logFatal("Invalid buffer element type!");
-        // NOTE: Does this destroy terminal output?
-        // exit(-1);
+        logError("Invalid buffer element type!");
         return 0;
     }
 }
@@ -190,8 +188,7 @@ public:
         case BufferElementType::DOUBLE_MAT4X3:
             numComponents = 4;
         default:
-            logFatal("Invalid buffer element type!");
-            __debugbreak();
+            logError("Invalid buffer element type!");
             break;
         }
     }
