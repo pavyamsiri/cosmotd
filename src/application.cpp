@@ -13,6 +13,8 @@
 #include "buffer.h"
 #include "log.h"
 #include "texture.h"
+#include "simulation.h"
+#include "dw_simulation.h"
 
 Application::Application(int width, int height, const char *title)
 {
@@ -150,6 +152,9 @@ Application::Application(int width, int height, const char *title)
     std::vector<std::shared_ptr<Texture2D>> copyTextures = Texture2D::createTextures(textures[0]->width, textures[0]->height, textures.size());
     this->m_copyfields = copyTextures;
 
+    // Create simulation
+    m_simulation = new DomainWallSimulation(1.0f, 0.1f, 1.0f, 5.0f, 2.0f, 1.0f);
+
     // Initialisation complete
     this->isInitialised = true;
     logDebug("Application initialisation completed successfully!");
@@ -223,6 +228,8 @@ void Application::onRender()
     static float alpha = 2.0f;
     static float era = 1.0f;
 
+    logDebug("Starting render...");
+
     // Bind framebuffer
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer->framebufferID);
     glViewport(0, 0, m_framebuffer->width, m_framebuffer->height);
@@ -230,58 +237,106 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(0);
-    m_firstComputeProgram->use();
-    glUniform1f(0, dx);
-    glUniform1f(1, dt);
-    if (pingpong)
+    if (!testingFlag)
     {
-        glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glUseProgram(0);
+        m_firstComputeProgram->use();
+        glUniform1f(0, dx);
+        glUniform1f(1, dt);
+        if (pingpong)
+        {
+            std::stringstream firstStream;
+            std::stringstream secondStream;
+            firstStream << "Binding texture " << m_fields[0]->textureID << " as read texture of first stage";
+            logTrace(firstStream.str().c_str());
+            secondStream << "Binding texture " << m_copyfields[0]->textureID << " as write texture of first stage";
+            logTrace(secondStream.str().c_str());
+            glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        }
+        else
+        {
+            std::stringstream firstStream;
+            std::stringstream secondStream;
+            firstStream << "Binding texture " << m_copyfields[0]->textureID << " as read texture of first stage";
+            logTrace(firstStream.str().c_str());
+            secondStream << "Binding texture " << m_fields[0]->textureID << " as write texture of first stage";
+            logTrace(secondStream.str().c_str());
+            glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        }
+        glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        pingpong = !pingpong;
+
+        glUseProgram(0);
+        m_secondComputeProgram->use();
+        glUniform1f(0, dx);
+        glUniform1f(1, dt);
+        glUniform1f(2, eta);
+        glUniform1f(3, lam);
+        glUniform1f(4, alpha);
+        glUniform1f(5, era);
+        if (!pingpong)
+        {
+            std::stringstream firstStream;
+            std::stringstream secondStream;
+            firstStream << "Binding texture " << m_copyfields[0]->textureID << " as read texture of second stage";
+            logTrace(firstStream.str().c_str());
+            secondStream << "Binding texture " << m_fields[0]->textureID << " as write texture of second stage";
+            logTrace(secondStream.str().c_str());
+            glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        }
+        else
+        {
+            std::stringstream firstStream;
+            std::stringstream secondStream;
+            firstStream << "Binding texture " << m_fields[0]->textureID << " as read texture of second stage";
+            logTrace(firstStream.str().c_str());
+            secondStream << "Binding texture " << m_copyfields[0]->textureID << " as write texture of second stage";
+            logTrace(secondStream.str().c_str());
+            glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        }
+        glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+
+    if (testingFlag)
+    {
+        m_simulation->step();
     }
     else
     {
-        glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        pingpong = !pingpong;
     }
-    glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    pingpong = !pingpong;
-
-    glUseProgram(0);
-    m_secondComputeProgram->use();
-    glUniform1f(0, dx);
-    glUniform1f(1, dt);
-    glUniform1f(2, eta);
-    glUniform1f(3, lam);
-    glUniform1f(4, alpha);
-    glUniform1f(5, era);
-    if (!pingpong)
-    {
-        glBindImageTexture(0, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        glBindImageTexture(1, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    }
-    else
-    {
-        glBindImageTexture(0, m_fields[0]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        glBindImageTexture(1, m_copyfields[0]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    }
-    glDispatchCompute(ceil(m_fields[0]->width / 8), ceil(m_fields[0]->height / 4), 1);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    pingpong = !pingpong;
 
     m_textureProgram->use();
     // Bind uniforms here
     glUniform1f(0, eta);
-    if (pingpong)
+    if (testingFlag)
     {
-        m_fields[0]->bind(0);
+        auto textures = m_simulation->getRenderTextures();
+        textures[0]->bind(0);
     }
     else
     {
-        m_copyfields[0]->bind(0);
+        if (pingpong)
+        {
+            std::stringstream traceStream;
+            traceStream << "Binding texture " << m_fields[0]->textureID << " as the render texture";
+            logTrace(traceStream.str().c_str());
+            m_fields[0]->bind(0);
+        }
+        else
+        {
+            std::stringstream traceStream;
+            traceStream << "Binding texture " << m_copyfields[0]->textureID << " as the render texture";
+            logTrace(traceStream.str().c_str());
+            m_copyfields[0]->bind(0);
+        }
     }
 
     // Bind VAO
@@ -356,13 +411,13 @@ void Application::onImGuiRender()
     if (ImGui::Begin("Left Hand Window"))
     {
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_imguiIO->Framerate, m_imguiIO->Framerate);
+        ImGui::Checkbox("Test new Stuff", &testingFlag);
     }
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
     {
         ImGui::Text("HELLO");
-        ImGui::SliderInt("Swap fields", &swapFields, 0, 3);
-        // ImGui::Checkbox("Pingpong", &pingpong);
+        m_simulation->displayUniforms();
     }
     ImGui::End();
 

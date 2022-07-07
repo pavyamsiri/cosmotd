@@ -1,5 +1,4 @@
-#ifndef APPLICATION_H
-#define APPLICATION_H
+#pragma once
 // Standard libraries
 
 // External libraries
@@ -15,6 +14,7 @@
 #include <buffer.h>
 #include <framebuffer.h>
 #include <texture.h>
+#include "simulation.h"
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -64,7 +64,8 @@ private:
     ComputeShaderProgram *m_firstComputeProgram;
     ComputeShaderProgram *m_secondComputeProgram;
 
-    bool pingpong = true;
-};
+    Simulation *m_simulation;
 
-#endif
+    bool pingpong = true;
+    bool testingFlag = false;
+};

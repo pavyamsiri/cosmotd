@@ -1,5 +1,5 @@
 #pragma once
-#include <shader.h>
+#include "shader.h"
 
 class VertexFragmentShaderProgram
 {
@@ -22,5 +22,5 @@ public:
     ComputeShaderProgram(Shader *computeShader);
     ~ComputeShaderProgram();
 
-    void use();
+    void const use() const;
 };

@@ -35,15 +35,20 @@ vec4 laplacian(ivec2 pos, float dx) {
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 field = imageLoad(inTexture, pos);
-    float value = field.r;
-    float velocity = field.g;
+    float nextValue = field.r;
+    float currentVelocity = field.g;
     float acceleration = field.b;
-    float time = field.a;
+    float nextTime = field.a;
 
-    float nextAcceleration = laplacian(pos, dx).r - alpha * (era / time) * velocity - lam * (value * value  - eta * eta) * value;
+    // Laplacian term
+    float nextAcceleration = laplacian(pos, dx).r;
+    // 'Damping' term
+    nextAcceleration -= alpha * (era / nextTime) * currentVelocity;
+    // Potential derivative
+    nextAcceleration -= lam * (pow(nextValue, 2)  - pow(eta, 2)) * nextValue;
 
-    float nextVelocity = velocity + 0.5f * (acceleration + nextAcceleration) * dt;
+    float nextVelocity = currentVelocity + 0.5f * (acceleration + nextAcceleration) * pow(dt, 2);
 
 
-    imageStore(outTexture, pos, vec4(value, nextVelocity, nextAcceleration, time));
+    imageStore(outTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, nextTime));
 }

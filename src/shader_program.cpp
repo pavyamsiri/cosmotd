@@ -97,7 +97,7 @@ ComputeShaderProgram::~ComputeShaderProgram()
     logTrace("Compute shader program deleted.");
 }
 
-void ComputeShaderProgram::use()
+void const ComputeShaderProgram::use() const
 {
     glUseProgram(programID);
 }
