@@ -30,6 +30,10 @@ const char *convertUniformDataTypeToString(UniformDataType type)
 
 void Simulation::update()
 {
+    if (!runFlag)
+    {
+        return;
+    }
     // Might be better to move into loop and use static to only initialise once.
     const int xNumGroups = ceil(fields[0][pingpong].width / 8);
     const int yNumGroups = ceil(fields[0][pingpong].height / 4);
@@ -176,6 +180,8 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
+    ImGui::Checkbox("Running", &runFlag);
+
     // NOTE: These min and max values have been randomly selected. Might change these later.
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
     ImGui::SliderFloat("dt", &dt, 0.1f, 10.0f);

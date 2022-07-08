@@ -13,11 +13,11 @@ can be visually compared.
 the simulation with the saved fields. Can't be done because arrays diverge slightly which propagates.
 - [ ] Perform same tests with C++ version. Same as above.
 
-- [ ] Abstract the domain wall simulation into its own class or scene thing.
-    - It should expose public attributes that ImGUI should allow users to configure.
+- [x] Abstract the domain wall simulation into its own class or scene thing.
+    - [x] It should expose public attributes that ImGUI should allow users to configure.
     - It should be able to start, stop, restart, save and load.
-        - [ ] Start button to start simulation.
-        - [ ] Stop button to stop simulation.
+        - [x] Start button to start simulation.
+        - [x] Stop button to stop simulation.
         - [ ] Restart button to reset simulation back to original state.
         - [ ] Save button to save field configuration as a .ctdd file (file dialogs?).
         - [ ] Load button to load field configuration from a .ctdd file (file dialogs?).

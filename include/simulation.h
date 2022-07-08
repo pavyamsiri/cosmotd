@@ -166,4 +166,7 @@ private:
 
     // Pingpong variable
     bool pingpong = false;
+
+    // Run flag
+    bool runFlag = false;
 };
