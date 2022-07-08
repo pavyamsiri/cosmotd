@@ -21,3 +21,26 @@ the simulation with the saved fields. Can't be done because arrays diverge sligh
         - [ ] Restart button to reset simulation back to original state.
         - [ ] Save button to save field configuration as a .ctdd file (file dialogs?).
         - [ ] Load button to load field configuration from a .ctdd file (file dialogs?).
+
+## Ideas for Simulation Abstraction ##
+
+- Make simulation class generic over all simulations.
+- Done by having vectors storing various data types (for uniforms)
+    - i.e. `std::vector<float>` for all floats, float2, float3, float4 etc.
+- Configure by providing a layout like vertex buffer layout.
+- Each step would just then iterate over all fields (images) and then apply the uniforms according to the layout.
+
+## Discussion Points ##
+
+- I noticed a bug in the python version, the velocity update code used dt instead of dt^2.
+    - Since changing that I noticed that the evolution has changed.
+        - Most of the time, the evolution is just slower but not too different.
+        - Single and companion axion simulations seem to be different however. Can run some parameters are bit higher i.e.
+            the K value.
+- Tested the C++ version against the python version by using the same starting conditions.
+    - Results differed. C++ does not seem to dissipate and gets locked into a stable configuration (or at least evolution is so
+    slow that it is imperceivable).
+    - Tried to develop tests for python version to ensure consistency.
+        - Tests were unsuccessful because the floats in the arrays diverged despite evolution being deterministic.
+            - File saving and loading seems to work fine though. Tried the test on a calibration file.
+- Having trouble with simulation code when changing some things. Weird behaviour on the new architecture.
