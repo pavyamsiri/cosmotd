@@ -8,8 +8,8 @@ class Texture2D
 {
 public:
     uint32_t textureID;
-    uint32_t width;
-    uint32_t height;
+    uint32_t width = 0;
+    uint32_t height = 0;
 
     // Constructor
     Texture2D();

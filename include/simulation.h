@@ -1,87 +1,169 @@
 #pragma once
 
-// Standard libraries
 #include <vector>
 
-// External libraries
-#include <glad/glad.h>
-
-// Internal libraries
-#include "texture.h"
+#include "buffer.h"
 #include "shader_program.h"
+#include "texture.h"
+
+enum class UniformDataType
+{
+    NONE = 0,
+    INT,
+    INT2,
+    INT3,
+    INT4,
+    // NOTE: Unsigned integers are not supported as they can not easily be exposed using ImGui.
+    // UINT,
+    // UINT2,
+    // UINT3,
+    // UINT4,
+    FLOAT,
+    FLOAT2,
+    FLOAT3,
+    FLOAT4,
+    // NOTE: Using doubles for uniforms requires an extension and so it won't be supported.
+    // DOUBLE,
+    // DOUBLE2,
+    // DOUBLE3,
+    // DOUBLE4,
+    // NOTE: Matrices could be added but there are no plans to add it.
+};
+
+const char *convertUniformDataTypeToString(UniformDataType type);
+struct SimulationElement
+{
+public:
+    UniformDataType type;
+    std::string name;
+
+    // Initial value
+
+    union startValue
+    {
+        float floatStartValue;
+        int32_t intStartValue;
+    } startValue;
+
+    // Min and max values
+    union minValue
+    {
+        float floatMinValue;
+        int32_t intMinValue;
+    } minValue;
+
+    union maxValue
+    {
+        float floatMaxValue;
+        int32_t intMaxValue;
+    } maxValue;
+};
+
+struct SimulationLayout
+{
+public:
+    SimulationLayout(const std::initializer_list<SimulationElement> &elements) : elements(elements) {}
+
+    // Extra simulation parameters
+    std::vector<SimulationElement> elements;
+};
 
 class Simulation
 {
 public:
-    virtual void displayUniforms() = 0;
-
-    virtual void bindUniforms() = 0;
-
-    std::vector<std::shared_ptr<Texture2D>> getRenderTextures()
+    Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
+        : firstPass(firstPass), secondPass(secondPass), layout(layout)
     {
-        // Create new vector
-        std::vector<std::shared_ptr<Texture2D>> renderTextures(m_images.size());
-        for (size_t index = 0; index < m_images.size(); index++)
+        // Initialise vector to store textures
+        for (int i = 0; i < numFields; i++)
         {
-            std::stringstream traceStream;
-            traceStream << "Binding texture " << m_images[index][!m_pingpong]->textureID << " as render texture";
-            logTrace(traceStream.str().c_str());
-            renderTextures[index] = m_images[index][!m_pingpong];
+            // Each field has two buffers to swap between
+            fields.push_back(std::vector<Texture2D>(2));
         }
 
-        return renderTextures;
-    }
-
-    void step()
-    {
-        for (const auto &fieldSet : m_images)
+        // Create uniform values
+        for (const auto &element : layout.elements)
         {
-            std::stringstream firstStream;
-            std::stringstream secondStream;
-            std::stringstream thirdStream;
-            std::stringstream fourthStream;
-            // Evolve each field
-            m_evolveFieldProgram->use();
-            glUniform1f(0, dx);
-            glUniform1f(1, dt);
-            // Bind read texture
-            glBindImageTexture(0, fieldSet[m_pingpong]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            firstStream << "Binding texture " << fieldSet[m_pingpong]->textureID << " as read texture of first stage.";
-            logTrace(firstStream.str().c_str());
-            // Bind write texture
-            glBindImageTexture(1, fieldSet[!m_pingpong]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-            secondStream << "Binding texture " << fieldSet[!m_pingpong]->textureID << " as write texture of first stage.";
-            logTrace(secondStream.str().c_str());
-            glDispatchCompute(ceil(fieldSet[m_pingpong]->width / 8), ceil(fieldSet[m_pingpong]->height / 4), 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-            // Evolve their velocity and acceleration
-            m_evolveVelocityAccelerationProgram->use();
-            bindUniforms();
-            // Bind read texture
-            glBindImageTexture(0, fieldSet[!m_pingpong]->textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            thirdStream << "Binding texture " << fieldSet[!m_pingpong]->textureID << " as read texture of second stage.";
-            logTrace(thirdStream.str().c_str());
-            // Bind write texture
-            glBindImageTexture(1, fieldSet[m_pingpong]->textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-            fourthStream << "Binding texture " << fieldSet[m_pingpong]->textureID << " as write texture of second stage.";
-            logTrace(fourthStream.str().c_str());
-            glDispatchCompute(ceil(fieldSet[m_pingpong]->width / 8), ceil(fieldSet[m_pingpong]->height / 4), 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-            // Swap read and write images
-            m_pingpong = !m_pingpong;
+            switch (element.type)
+            {
+            case UniformDataType::FLOAT:
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                break;
+            // TODO: Vectors might have different initial values. How do we encode that though?
+            case UniformDataType::FLOAT2:
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                break;
+            case UniformDataType::FLOAT3:
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                break;
+            case UniformDataType::FLOAT4:
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue.floatStartValue);
+                break;
+            case UniformDataType::INT:
+                intUniforms.push_back(element.startValue.intStartValue);
+                break;
+            // TODO: Vectors might have different initial values. How do we encode that though?
+            case UniformDataType::INT2:
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                break;
+            case UniformDataType::INT3:
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                break;
+            case UniformDataType::INT4:
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back(element.startValue.intStartValue);
+                break;
+            default:
+                std::stringstream warningStream;
+                warningStream << "The given uniform data type " << convertUniformDataTypeToString(element.type);
+                warningStream << " for the uniform named " << element.name << " is invalid!";
+                logWarning(warningStream.str().c_str());
+                break;
+            }
         }
     }
+    ~Simulation();
 
-protected:
-    float dx;
-    float dt;
+    void setField(std::vector<std::shared_ptr<Texture2D>> startFields);
 
-    // Nx2 vector - each row is a vector of 2 images used for pingpong. N == the number of fields in the simulation
-    std::vector<std::vector<std::shared_ptr<Texture2D>>> m_images;
-    bool m_pingpong = false;
+    void update();
 
-    ComputeShaderProgram *m_evolveFieldProgram;
-    ComputeShaderProgram *m_evolveVelocityAccelerationProgram;
+    void bindUniforms();
+
+    void onUIRender();
+
+    Texture2D *getRenderTexture(uint32_t fieldIndex);
+
+private:
+    // Field data
+    std::vector<std::vector<Texture2D>> fields;
+
+    ComputeShaderProgram *firstPass;
+    ComputeShaderProgram *secondPass;
+    // Universal parameters
+    float dx = 1.0f;
+    float dt = 0.1f;
+    float alpha = 2.0f;
+    float era = 1.0f;
+
+    // Extra simulation parameters that are non-specific
+    SimulationLayout layout;
+
+    // Uniforms
+    std::vector<float> floatUniforms;
+    std::vector<int32_t> intUniforms;
+
+    // Pingpong variable
+    bool pingpong = false;
 };

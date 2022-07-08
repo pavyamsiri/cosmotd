@@ -56,16 +56,6 @@ private:
     // Rendering
     VertexFragmentShaderProgram *m_textureProgram;
     VertexArray *m_mainViewportVertexArray;
-    // TODO: This should be paired with a compute program (multiple pass shader program)
-    std::vector<std::shared_ptr<Texture2D>> m_fields;
-    std::vector<std::shared_ptr<Texture2D>> m_copyfields;
-
-    // Compute shader
-    ComputeShaderProgram *m_firstComputeProgram;
-    ComputeShaderProgram *m_secondComputeProgram;
 
     Simulation *m_simulation;
-
-    bool pingpong = true;
-    bool testingFlag = false;
 };

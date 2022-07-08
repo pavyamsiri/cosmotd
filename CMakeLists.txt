@@ -34,6 +34,7 @@ add_executable(cosmotd
     src/buffer.cpp
     src/framebuffer.cpp
     src/texture.cpp
+    src/simulation.cpp
     external/glad/src/glad.c
     external/imgui/imgui_demo.cpp
     external/imgui/imgui_draw.cpp
