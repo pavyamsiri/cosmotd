@@ -1,5 +1,6 @@
 // Standard libraries
 #include <sstream>
+#include <stdio.h>
 
 // External libraries
 #include <glad/glad.h>
@@ -14,6 +15,28 @@
 #include "log.h"
 #include "texture.h"
 #include "simulation.h"
+
+void GLAPIENTRY
+messageCallback(GLenum source,
+                GLenum type,
+                GLuint id,
+                GLenum severity,
+                GLsizei length,
+                const GLchar *message,
+                const void *userParam)
+{
+    char outMessage[1024];
+    sprintf(outMessage, "OpenGL: type = 0x%x, severity = 0x%x, message = %s",
+            type, severity, message);
+    if (type == GL_DEBUG_TYPE_ERROR)
+    {
+        logError(outMessage);
+    }
+    else
+    {
+        logDebug(outMessage);
+    }
+}
 
 Application::Application(int width, int height, const char *title)
 {
@@ -42,6 +65,10 @@ Application::Application(int width, int height, const char *title)
         logFatal("Failed to initialise GLAD");
         return;
     }
+
+    // Set up debugging
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(messageCallback, 0);
 
     // Set up ImGUI
     IMGUI_CHECKVERSION();
@@ -91,6 +118,7 @@ Application::Application(int width, int height, const char *title)
         return;
     }
     Shader *secondComputeShader = new Shader("shaders/evolve_velocity_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    // Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
     if (!secondComputeProgram->isInitialised)
     {
@@ -144,13 +172,25 @@ Application::Application(int width, int height, const char *title)
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     this->m_framebuffer = framebuffer;
 
+    // Domain wall
     SimulationLayout simulationLayout = {
-        {UniformDataType::FLOAT, std::string("eta"), 0.0f, 10.0f},
-        {UniformDataType::FLOAT, std::string("lam"), 0.1f, 10.0f}};
+        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
+
+    // // Single axion
+    // SimulationLayout simulationLayout = {
+    //     {UniformDataType::FLOAT, std::string("eta"), 0.0f, 10.0f},
+    //     {UniformDataType::FLOAT, std::string("lam"), 0.1f, 10.0f},
+    //     {UniformDataType::FLOAT, std::string("colorAnomaly"), 0.1f, 10.0f},
+    //     {UniformDataType::FLOAT, std::string("axionStrength"), 0.1f, 10.0f},
+    //     {UniformDataType::FLOAT, std::string("growthScale"), 0.1f, 1000.0f},
+    //     {UniformDataType::FLOAT, std::string("growthLaw"), 1.0f, 7.0f},
+    // };
 
     this->m_simulation = new Simulation(1, firstComputeProgram, secondComputeProgram, simulationLayout);
 
     m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
 
     // Initialisation complete
     this->isInitialised = true;
@@ -228,7 +268,7 @@ void Application::onRender()
     m_textureProgram->use();
     // Bind uniforms here
     glUniform1f(0, 1.0f);
-    Texture2D *renderTexture = m_simulation->getRenderTexture(0);
+    Texture2D *renderTexture = m_simulation->getCurrentRenderTexture();
     renderTexture->bind(0);
 
     // Bind VAO

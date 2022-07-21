@@ -17,17 +17,10 @@ Texture2D::Texture2D()
     // Set texture filtering parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Log
     std::stringstream debugStream;
-    debugStream << "2D texture created with ID " << textureID;
+    debugStream << "Created Texture2D with ID " << textureID;
     logDebug(debugStream.str().c_str());
-}
-
-Texture2D::~Texture2D()
-{
-    std::stringstream traceStream;
-    traceStream << "Deleting 2D texture with ID " << textureID;
-    logDebug(traceStream.str().c_str());
-    glDeleteTextures(1, &textureID);
 }
 
 void Texture2D::bind(uint32_t target)
@@ -38,6 +31,15 @@ void Texture2D::bind(uint32_t target)
 void Texture2D::unbind(uint32_t target)
 {
     glBindTextureUnit(target, 0);
+}
+
+void Texture2D::release()
+{
+    glDeleteTextures(1, &textureID);
+    // Log
+    std::stringstream traceStream;
+    traceStream << "Deleted Texture2D with ID " << textureID;
+    logDebug(traceStream.str().c_str());
 }
 
 // Texture data setters

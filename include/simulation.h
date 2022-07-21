@@ -144,9 +144,11 @@ public:
     void onUIRender();
 
     Texture2D *getRenderTexture(uint32_t fieldIndex);
+    Texture2D *getCurrentRenderTexture();
 
 private:
     // Field data
+    std::vector<std::shared_ptr<Texture2D>> originalFields;
     std::vector<std::vector<Texture2D>> fields;
 
     ComputeShaderProgram *firstPass;
@@ -169,4 +171,7 @@ private:
 
     // Run flag
     bool runFlag = false;
+
+    // Render field index
+    int32_t renderIndex = 0;
 };

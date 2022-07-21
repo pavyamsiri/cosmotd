@@ -14,21 +14,13 @@ the simulation with the saved fields. Can't be done because arrays diverge sligh
 - [ ] Perform same tests with C++ version. Same as above.
 
 - [x] Abstract the domain wall simulation into its own class or scene thing.
-    - [x] It should expose public attributes that ImGUI should allow users to configure.
+    - It should expose public attributes that ImGUI should allow users to configure.
     - It should be able to start, stop, restart, save and load.
         - [x] Start button to start simulation.
         - [x] Stop button to stop simulation.
         - [ ] Restart button to reset simulation back to original state.
         - [ ] Save button to save field configuration as a .ctdd file (file dialogs?).
         - [ ] Load button to load field configuration from a .ctdd file (file dialogs?).
-
-## Ideas for Simulation Abstraction ##
-
-- Make simulation class generic over all simulations.
-- Done by having vectors storing various data types (for uniforms)
-    - i.e. `std::vector<float>` for all floats, float2, float3, float4 etc.
-- Configure by providing a layout like vertex buffer layout.
-- Each step would just then iterate over all fields (images) and then apply the uniforms according to the layout.
 
 ## Discussion Points ##
 

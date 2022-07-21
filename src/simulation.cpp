@@ -54,26 +54,66 @@ void Simulation::update()
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
 
-    // Evolve velocity and acceleration for all fields
+    // TODO: This is the previous implementation of velocity and acceleration evolution. Shaders are ran for each field separately.
+    // // Evolve velocity and acceleration for all fields
+    // for (const auto &currentField : fields)
+    // {
+    //     secondPass->use();
+    //     glUniform1f(0, dx);
+    //     glUniform1f(1, dt);
+    //     glUniform1f(2, alpha);
+    //     glUniform1f(3, era);
+    //     // Bind the rest of the uniforms
+    //     bindUniforms();
+
+    //     // Bind read image
+    //     glBindImageTexture(0, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    //     // Bind write image
+    //     glBindImageTexture(1, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    //     // Binding the other fields as read only
+    //     // TODO: This is not really robust as this iteration has no explicit order and so it might not match up with the shader.
+    //     int otherIndex = 2;
+    //     for (const auto &otherField : fields)
+    //     {
+    //         // Skip if same
+    //         if (&currentField == &otherField)
+    //         {
+    //             continue;
+    //         }
+    //         else
+    //         {
+    //             glBindImageTexture(otherIndex, otherField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    //             otherIndex++;
+    //         }
+    //     }
+
+    //     // Dispatch and barrier
+    //     glDispatchCompute(xNumGroups, yNumGroups, 1);
+    //     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    // }
+
+    // TODO: This is the new implementation where we run one shader to evolve all field's acceleration and velocity.
+    secondPass->use();
+    glUniform1f(0, dx);
+    glUniform1f(1, dt);
+    glUniform1f(2, alpha);
+    glUniform1f(3, era);
+    // Bind the rest of the uniforms
+    bindUniforms();
+    uint32_t bindIndex = 0;
     for (const auto &currentField : fields)
     {
-        secondPass->use();
-        glUniform1f(0, dx);
-        glUniform1f(1, dt);
-        glUniform1f(2, alpha);
-        glUniform1f(3, era);
-        // Bind the rest of the uniforms
-        bindUniforms();
-
-        // TODO: Need to bind every other field as well as they will be needed. Just as read only images.
         // Bind read image
-        glBindImageTexture(0, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(bindIndex++, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Bind write image
-        glBindImageTexture(1, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        // Dispatch and barrier
-        glDispatchCompute(xNumGroups, yNumGroups, 1);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        glActiveTexture(GL_TEXTURE1);
+        glBindImageTexture(bindIndex++, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     }
+
+    // Dispatch and barrier
+    glDispatchCompute(xNumGroups, yNumGroups, 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
     // Swap buffers
     pingpong = !pingpong;
@@ -181,6 +221,18 @@ void Simulation::bindUniforms()
 void Simulation::onUIRender()
 {
     ImGui::Checkbox("Running", &runFlag);
+
+    // Reset button
+    if (ImGui::Button("Reset field"))
+    {
+        setField(originalFields);
+    }
+
+    // Toggle field to display if there is more than one field
+    if (fields.size() > 1)
+    {
+        ImGui::SliderInt("Select fields", &renderIndex, 0, fields.size() - 1);
+    }
 
     // NOTE: These min and max values have been randomly selected. Might change these later.
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
@@ -290,26 +342,48 @@ void Simulation::onUIRender()
 
 void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
 {
+    // Resize vector if necessary
+    if (startFields.size() > fields.size())
+    {
+        fields.resize(startFields.size());
+    }
+    // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
+    // reset to the original field.
+    originalFields = std::vector<std::shared_ptr<Texture2D>>(startFields);
+
     // Copy texture data over
     uint32_t fieldIndex = 0;
     for (const auto &currentField : startFields)
     {
+        // Resize inner vector if necessary
+        if (fields[fieldIndex].size() < 2)
+        {
+            fields[fieldIndex].resize(2);
+        }
+
         // Set width and height for textures
-        fields[fieldIndex][0].width = currentField->width;
-        fields[fieldIndex][0].height = currentField->height;
-        fields[fieldIndex][1].width = currentField->width;
-        fields[fieldIndex][1].height = currentField->height;
+        uint32_t height = currentField->height;
+        uint32_t width = currentField->width;
+        fields[fieldIndex][0].width = width;
+        fields[fieldIndex][0].height = height;
+        fields[fieldIndex][1].width = width;
+        fields[fieldIndex][1].height = height;
 
         // Allocate data for textures
         glBindTexture(GL_TEXTURE_2D, fields[fieldIndex][0].textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, currentField->width, currentField->height, 0, GL_RGBA, GL_FLOAT, nullptr);
-        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex][1].textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, currentField->width, currentField->height, 0, GL_RGBA, GL_FLOAT, nullptr);
-
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
         glCopyImageSubData(
             currentField->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             fields[fieldIndex][0].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
-            currentField->width, currentField->height, 1);
+            width, height, 1);
+
+        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex][1].textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glCopyImageSubData(
+            currentField->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+            fields[fieldIndex][1].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+            width, height, 1);
+
         fieldIndex++;
     }
 }
@@ -317,4 +391,9 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
 Texture2D *Simulation::getRenderTexture(uint32_t fieldIndex)
 {
     return &fields[fieldIndex][!pingpong];
+}
+
+Texture2D *Simulation::getCurrentRenderTexture()
+{
+    return &fields[renderIndex][!pingpong];
 }
