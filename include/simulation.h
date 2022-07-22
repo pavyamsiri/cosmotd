@@ -71,15 +71,12 @@ public:
 class Simulation
 {
 public:
-    Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
-        : firstPass(firstPass), secondPass(secondPass), layout(layout)
+    Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *laplacianPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
+        : firstPass(firstPass), laplacianPass(laplacianPass), secondPass(secondPass), layout(layout)
     {
-        // Initialise vector to store textures
-        for (int i = 0; i < numFields; i++)
-        {
-            // Each field has two buffers to swap between
-            fields.push_back(std::vector<Texture2D>(2));
-        }
+        // Resize vectors to the correct number of fields
+        fields.resize(numFields);
+        laplacians.resize(numFields);
 
         // Create uniform values
         for (const auto &element : layout.elements)
@@ -149,9 +146,11 @@ public:
 private:
     // Field data
     std::vector<std::shared_ptr<Texture2D>> originalFields;
-    std::vector<std::vector<Texture2D>> fields;
+    std::vector<Texture2D> fields;
+    std::vector<Texture2D> laplacians;
 
     ComputeShaderProgram *firstPass;
+    ComputeShaderProgram *laplacianPass;
     ComputeShaderProgram *secondPass;
     // Universal parameters
     float dx = 1.0f;
@@ -166,12 +165,12 @@ private:
     std::vector<float> floatUniforms;
     std::vector<int32_t> intUniforms;
 
-    // Pingpong variable
-    bool pingpong = false;
-
     // Run flag
     bool runFlag = false;
 
     // Render field index
     int32_t renderIndex = 0;
+
+    // Show laplacian
+    bool laplacianFlag = false;
 };

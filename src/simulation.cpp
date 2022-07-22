@@ -35,62 +35,38 @@ void Simulation::update()
         return;
     }
     // Might be better to move into loop and use static to only initialise once.
-    const int xNumGroups = ceil(fields[0][pingpong].width / 8);
-    const int yNumGroups = ceil(fields[0][pingpong].height / 4);
+    // const int xNumGroups = ceil(fields[0].width / 8);
+    // const int yNumGroups = ceil(fields[0].height / 4);
+    const int xNumGroups = ceil(fields[0].width / 4);
+    const int yNumGroups = ceil(fields[0].height / 4);
 
     // Evolve field and time for all fields first
+    uint32_t fieldIndex = 0;
     for (const auto &currentField : fields)
     {
         firstPass->use();
-        glUniform1f(0, dx);
-        glUniform1f(1, dt);
+        glUniform1f(0, dt);
         // Bind read image
-        glBindImageTexture(0, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        // Bind write image
-        glBindImageTexture(1, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
         // Dispatch and barrier
         glDispatchCompute(xNumGroups, yNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        laplacianPass->use();
+        glUniform1f(0, dx);
+        // Bind images
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glActiveTexture(GL_TEXTURE1);
+        glBindImageTexture(1, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        // Dispatch and barrier
+        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        fieldIndex++;
     }
-
-    // TODO: This is the previous implementation of velocity and acceleration evolution. Shaders are ran for each field separately.
-    // // Evolve velocity and acceleration for all fields
-    // for (const auto &currentField : fields)
-    // {
-    //     secondPass->use();
-    //     glUniform1f(0, dx);
-    //     glUniform1f(1, dt);
-    //     glUniform1f(2, alpha);
-    //     glUniform1f(3, era);
-    //     // Bind the rest of the uniforms
-    //     bindUniforms();
-
-    //     // Bind read image
-    //     glBindImageTexture(0, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    //     // Bind write image
-    //     glBindImageTexture(1, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    //     // Binding the other fields as read only
-    //     // TODO: This is not really robust as this iteration has no explicit order and so it might not match up with the shader.
-    //     int otherIndex = 2;
-    //     for (const auto &otherField : fields)
-    //     {
-    //         // Skip if same
-    //         if (&currentField == &otherField)
-    //         {
-    //             continue;
-    //         }
-    //         else
-    //         {
-    //             glBindImageTexture(otherIndex, otherField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    //             otherIndex++;
-    //         }
-    //     }
-
-    //     // Dispatch and barrier
-    //     glDispatchCompute(xNumGroups, yNumGroups, 1);
-    //     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-    // }
 
     // TODO: This is the new implementation where we run one shader to evolve all field's acceleration and velocity.
     secondPass->use();
@@ -101,22 +77,23 @@ void Simulation::update()
     // Bind the rest of the uniforms
     bindUniforms();
     uint32_t bindIndex = 0;
+    fieldIndex = 0;
+    uint32_t activeTextureIndex = GL_TEXTURE0;
     for (const auto &currentField : fields)
     {
         // Bind read image
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(bindIndex++, currentField[!pingpong].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Bind write image
         glActiveTexture(GL_TEXTURE1);
-        glBindImageTexture(bindIndex++, currentField[pingpong].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(1, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+
+        fieldIndex++;
     }
 
     // Dispatch and barrier
     glDispatchCompute(xNumGroups, yNumGroups, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    // Swap buffers
-    pingpong = !pingpong;
 }
 
 void Simulation::bindUniforms()
@@ -220,7 +197,33 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
+    // TODO: REMOVE THIS IS FOR DEBUGGING ONLY
+    ImGui::Text("Current texture ID %d", fields[0].textureID);
+    ImGui::Text("Current laplacian texture ID %d", laplacians[0].textureID);
+
+    ImGui::Checkbox("Show Laplacian", &laplacianFlag);
     ImGui::Checkbox("Running", &runFlag);
+
+    // TODO: Remove this.
+    if (ImGui::Button("Apply Step"))
+    {
+        runFlag = true;
+        this->update();
+        runFlag = false;
+    }
+    if (ImGui::Button("Save fields"))
+    {
+        for (const auto &currentField : fields)
+        {
+            currentField.saveField("data/saved_field.ctdd");
+        }
+    }
+    if (ImGui::Button("Load fields"))
+    {
+        std::vector<std::shared_ptr<Texture2D>> loadedTextures = Texture2D::loadFromCTDDFile("data/saved_field.ctdd");
+        setField(loadedTextures);
+        originalFields = loadedTextures;
+    }
 
     // Reset button
     if (ImGui::Button("Reset field"))
@@ -236,7 +239,7 @@ void Simulation::onUIRender()
 
     // NOTE: These min and max values have been randomly selected. Might change these later.
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
-    ImGui::SliderFloat("dt", &dt, 0.1f, 10.0f);
+    ImGui::SliderFloat("dt", &dt, 0.001f, 1.0f);
 
     // TODO: This should not have intermediate values, but be a discrete choice between radiation and matter era.
     ImGui::SliderFloat("era", &era, 1.0f, 2.0f);
@@ -355,34 +358,27 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
     uint32_t fieldIndex = 0;
     for (const auto &currentField : startFields)
     {
-        // Resize inner vector if necessary
-        if (fields[fieldIndex].size() < 2)
-        {
-            fields[fieldIndex].resize(2);
-        }
-
         // Set width and height for textures
         uint32_t height = currentField->height;
         uint32_t width = currentField->width;
-        fields[fieldIndex][0].width = width;
-        fields[fieldIndex][0].height = height;
-        fields[fieldIndex][1].width = width;
-        fields[fieldIndex][1].height = height;
+        fields[fieldIndex].width = width;
+        fields[fieldIndex].height = height;
 
         // Allocate data for textures
-        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex][0].textureID);
+        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex].textureID);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
         glCopyImageSubData(
             currentField->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
-            fields[fieldIndex][0].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+            fields[fieldIndex].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             width, height, 1);
 
-        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex][1].textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        glCopyImageSubData(
-            currentField->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
-            fields[fieldIndex][1].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
-            width, height, 1);
+        if (laplacians[fieldIndex].width != width && laplacians[fieldIndex].height != height)
+        {
+            glBindTexture(GL_TEXTURE_2D, laplacians[fieldIndex].textureID);
+            glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, width, height);
+            laplacians[fieldIndex].width = width;
+            laplacians[fieldIndex].height = height;
+        }
 
         fieldIndex++;
     }
@@ -390,10 +386,17 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
 
 Texture2D *Simulation::getRenderTexture(uint32_t fieldIndex)
 {
-    return &fields[fieldIndex][!pingpong];
+    return &fields[fieldIndex];
 }
 
 Texture2D *Simulation::getCurrentRenderTexture()
 {
-    return &fields[renderIndex][!pingpong];
+    if (laplacianFlag)
+    {
+        return &laplacians[renderIndex];
+    }
+    else
+    {
+        return &fields[renderIndex];
+    }
 }

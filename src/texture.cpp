@@ -15,8 +15,8 @@ Texture2D::Texture2D()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     // Set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     // Log
     std::stringstream debugStream;
     debugStream << "Created Texture2D with ID " << textureID;
@@ -40,6 +40,67 @@ void Texture2D::release()
     std::stringstream traceStream;
     traceStream << "Deleted Texture2D with ID " << textureID;
     logDebug(traceStream.str().c_str());
+}
+
+const void Texture2D::saveField(const char *filePath) const
+{
+    glBindTexture(GL_TEXTURE_2D, this->textureID);
+    int M, N;
+    int miplevel = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
+
+    std::vector<float> textureData(M * N * 4);
+
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(textureData.data()));
+    auto errorCode = glGetError();
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    std::ofstream dataFile;
+    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        uint32_t numFields = 1;
+
+        dataFile.open(filePath, std::ios::binary);
+        // Write header
+        dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
+        dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
+        dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+
+        // Create list of textures
+        std::vector<std::shared_ptr<Texture2D>> fields(numFields);
+
+        // Read data
+        for (int fieldIndex = 0; fieldIndex < numFields; fieldIndex++)
+        {
+            for (int rowIndex = 0; rowIndex < M; rowIndex++)
+            {
+                for (int columnIndex = 0; columnIndex < N; columnIndex++)
+                {
+                    float fieldValue = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0];
+                    float fieldVelocity = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1];
+                    float fieldAcceleration = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2];
+                    dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
+                }
+            }
+        }
+
+        // Current time
+        std::stringstream timeStream;
+        timeStream << "Current time = " << textureData[3];
+        logTrace(timeStream.str().c_str());
+        dataFile.close();
+        logTrace("Successfully wrote field data to binary file!");
+    }
+    catch (std::ifstream::failure &e)
+    {
+        std::stringstream errorStream;
+        errorStream << "Failed to open file to write to at path: " << filePath << " - " << e.what();
+        logError(errorStream.str().c_str());
+    }
 }
 
 // Texture data setters

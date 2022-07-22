@@ -32,7 +32,7 @@ messageCallback(GLenum source,
     {
         logError(outMessage);
     }
-    else
+    else if (severity != 0x826b)
     {
         logDebug(outMessage);
     }
@@ -117,7 +117,13 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    Shader *secondComputeShader = new Shader("shaders/evolve_velocity_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
+    if (!laplacianComputeProgram->isInitialised)
+    {
+        return;
+    }
+    Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
     // Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
     if (!secondComputeProgram->isInitialised)
@@ -126,6 +132,7 @@ Application::Application(int width, int height, const char *title)
     }
 
     delete firstComputeShader;
+    delete laplacianComputeShader;
     delete secondComputeShader;
 
     this->m_textureProgram = textureProgram;
@@ -187,8 +194,10 @@ Application::Application(int width, int height, const char *title)
     //     {UniformDataType::FLOAT, std::string("growthLaw"), 1.0f, 7.0f},
     // };
 
-    this->m_simulation = new Simulation(1, firstComputeProgram, secondComputeProgram, simulationLayout);
+    this->m_simulation = new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
 
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/vertical_strip.ctdd"));
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/laplacian_test.ctdd"));
     m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
     // m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
 
