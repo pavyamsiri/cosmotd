@@ -67,3 +67,9 @@ add_custom_target(copy_data
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/src/data ${CMAKE_CURRENT_BINARY_DIR}/data
 )
 add_dependencies(cosmotd copy_data)
+
+# Copy over colormap folder
+add_custom_target(copy_colormap
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/src/colormaps ${CMAKE_CURRENT_BINARY_DIR}/colormaps
+)
+add_dependencies(cosmotd copy_colormap)

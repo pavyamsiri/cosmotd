@@ -26,9 +26,7 @@ vec3 viridis(float t) {
 
 void main()
 {
-    // float maxValue = min(1.1f * eta, eta + 0.1f);
-	// float fieldValue = (texture(inFieldTexture, inTextureCoordinate).b + maxValue) / 2;
-    // outColor = vec4(viridis(fieldValue), 1.0f);
-
-    outColor = texture(inFieldTexture, inTextureCoordinate);
+    float maxValue = min(1.1f * eta, eta + 0.1f);
+	float fieldValue = (texture(inFieldTexture, inTextureCoordinate).r + maxValue) / 2;
+    outColor = vec4(viridis(fieldValue), 1.0f);
 }

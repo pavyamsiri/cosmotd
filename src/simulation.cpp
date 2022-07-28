@@ -72,8 +72,7 @@ void Simulation::update()
     secondPass->use();
     glUniform1f(0, dx);
     glUniform1f(1, dt);
-    glUniform1f(2, alpha);
-    glUniform1f(3, era);
+    glUniform1i(2, era);
     // Bind the rest of the uniforms
     bindUniforms();
     uint32_t bindIndex = 0;
@@ -81,12 +80,12 @@ void Simulation::update()
     uint32_t activeTextureIndex = GL_TEXTURE0;
     for (const auto &currentField : fields)
     {
-        // Bind read image
+        // Bind field
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        // Bind write image
+        glBindImageTexture(bindIndex++, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Bind its laplacian
         glActiveTexture(GL_TEXTURE1);
-        glBindImageTexture(1, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(bindIndex++, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
         fieldIndex++;
     }
@@ -100,7 +99,7 @@ void Simulation::bindUniforms()
 {
     // NOTE: This is hardcoded to be 4 because currently the first four uniform locations are taken by the universal parameters.
     // They might be packed together as one float4 though and so this value might need to change to 1.
-    uint32_t currentLocation = 4;
+    uint32_t currentLocation = 3;
 
     // Reset uniform indices
     uint32_t floatUniformIndex = 0;
@@ -242,7 +241,7 @@ void Simulation::onUIRender()
     ImGui::SliderFloat("dt", &dt, 0.001f, 1.0f);
 
     // TODO: This should not have intermediate values, but be a discrete choice between radiation and matter era.
-    ImGui::SliderFloat("era", &era, 1.0f, 2.0f);
+    ImGui::SliderInt("era", &era, 1, 2);
 
     // Initialise uniform indices
     uint32_t floatUniformIndex = 0;
@@ -349,6 +348,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
     if (startFields.size() > fields.size())
     {
         fields.resize(startFields.size());
+        laplacians.resize(startFields.size());
     }
     // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
     // reset to the original field.

@@ -156,7 +156,7 @@ private:
     float dx = 1.0f;
     float dt = 0.1f;
     float alpha = 2.0f;
-    float era = 1.0f;
+    int era = 1;
 
     // Extra simulation parameters that are non-specific
     SimulationLayout layout;

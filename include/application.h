@@ -58,4 +58,6 @@ private:
     VertexArray *m_mainViewportVertexArray;
 
     Simulation *m_simulation;
+
+    std::shared_ptr<Texture2D> m_colorMap;
 };

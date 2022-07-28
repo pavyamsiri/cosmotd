@@ -94,7 +94,8 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    Shader *fragmentShader = new Shader("shaders/plot_field.glsl", ShaderType::FRAGMENT_SHADER);
+    Shader *fragmentShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
+    // Shader *fragmentShader = new Shader("shaders/texture_fragment.glsl", ShaderType::FRAGMENT_SHADER);
     if (!fragmentShader->isInitialised)
     {
         return;
@@ -123,8 +124,9 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
+    // Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
     // Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
+    Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
     if (!secondComputeProgram->isInitialised)
     {
@@ -142,22 +144,22 @@ Application::Application(int width, int height, const char *title)
         // Top left -  screen coordinates
         -1.0f, +1.0f,
         // Top left - UV
-        0.0f, 1.0f,
+        0.0f, 0.0f,
 
         // Top right -  screen coordinates
         +1.0f, +1.0f,
         // Top right - UV
-        1.0f, 1.0f,
+        1.0f, 0.0f,
 
         // Bottom left -  screen coordinates
         -1.0f, -1.0f,
         // Bottom left - UV
-        0.0f, 0.0f,
+        0.0f, 1.0f,
 
         // Bottom right -  screen coordinates
         1.0f, -1.0f,
         // Bottom right - UV
-        1.0f, 0.0f};
+        1.0f, 1.0f};
 
     uint32_t indices[] = {
         1, 3, 0, // first triangle
@@ -198,8 +200,10 @@ Application::Application(int width, int height, const char *title)
 
     // m_simulation->setField(Texture2D::loadFromCTDDFile("data/vertical_strip.ctdd"));
     // m_simulation->setField(Texture2D::loadFromCTDDFile("data/laplacian_test.ctdd"));
-    m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
+    m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np489744.ctdd"));
+
+    m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
 
     // Initialisation complete
     this->isInitialised = true;
@@ -276,9 +280,11 @@ void Application::onRender()
 
     m_textureProgram->use();
     // Bind uniforms here
-    glUniform1f(0, 1.0f);
-    Texture2D *renderTexture = m_simulation->getCurrentRenderTexture();
-    renderTexture->bind(0);
+    // glUniform1f(0, 1.0f);
+    // Texture2D *renderTexture = m_simulation->getCurrentRenderTexture();
+    m_colorMap->bind(0);
+    m_simulation->getRenderTexture(0)->bind(1);
+    m_simulation->getRenderTexture(1)->bind(2);
 
     // Bind VAO
     m_mainViewportVertexArray->bind();

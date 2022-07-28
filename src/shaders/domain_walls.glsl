@@ -5,11 +5,12 @@ layout(rgba32f, binding = 1) readonly uniform image2D inLaplacianTexture;
 // Universal simulation uniform parameters
 layout(location=0) uniform float dx;
 layout(location=1) uniform float dt;
-layout(location=2) uniform float alpha;
-layout(location=3) uniform float era;
+layout(location=2) uniform int era;
 // Domain wall specific uniform parameters
-layout(location=4) uniform float eta;
-layout(location=5) uniform float lam;
+layout(location=3) uniform float eta;
+layout(location=4) uniform float lam;
+
+const float ALPHA_2D = 2.0f;
 
 
 void main() {
@@ -23,11 +24,11 @@ void main() {
     // Laplacian term
     float nextAcceleration = imageLoad(inLaplacianTexture, pos).r;
     // 'Damping' term
-    nextAcceleration -= 2.0f * (1.0f / nextTime) * currentVelocity;
+    nextAcceleration -= ALPHA_2D * (1.0f / nextTime) * currentVelocity;
     // Potential derivative
-    nextAcceleration -= 5.0f * (pow(nextValue, 2)  - 1.0f) * nextValue;
+    nextAcceleration -= lam * (pow(nextValue, 2)  - pow(eta, 2)) * nextValue;
 
-    float nextVelocity = currentVelocity + 0.5f * (acceleration + nextAcceleration) * 0.01f;
+    float nextVelocity = currentVelocity + 0.5f * (acceleration + nextAcceleration) * pow(dt, 2);
 
 
     imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, nextTime));
