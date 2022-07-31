@@ -26,7 +26,7 @@ add_subdirectory(external/glfw)
 
 # Create an executable with main.cpp as its entry point. glad.c is also to be added as a source file.
 add_executable(cosmotd
-    src/main_scaffold.cpp
+    src/main.cpp
     src/log.cpp
     src/application.cpp
     src/shader.cpp
