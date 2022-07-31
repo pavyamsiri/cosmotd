@@ -1,5 +1,6 @@
 #include <glad/glad.h>
 #include <imgui.h>
+#include <sstream>
 
 #include "simulation.h"
 
@@ -196,20 +197,8 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
-    // TODO: REMOVE THIS IS FOR DEBUGGING ONLY
-    ImGui::Text("Current texture ID %d", fields[0].textureID);
-    ImGui::Text("Current laplacian texture ID %d", laplacians[0].textureID);
-
     ImGui::Checkbox("Show Laplacian", &laplacianFlag);
     ImGui::Checkbox("Running", &runFlag);
-
-    // TODO: Remove this.
-    if (ImGui::Button("Apply Step"))
-    {
-        runFlag = true;
-        this->update();
-        runFlag = false;
-    }
     if (ImGui::Button("Save fields"))
     {
         for (const auto &currentField : fields)
@@ -296,8 +285,8 @@ void Simulation::onUIRender()
             ImGui::SliderInt(
                 element.name.c_str(),
                 &intUniforms[intUniformIndex],
-                element.minValue.intMinValue,
-                element.maxValue.intMaxValue);
+                (int)element.minValue.floatMinValue,
+                (int)element.maxValue.floatMaxValue);
 
             intUniformIndex++;
 

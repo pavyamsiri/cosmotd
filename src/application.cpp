@@ -125,8 +125,8 @@ Application::Application(int width, int height, const char *title)
         return;
     }
     // Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
-    // Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
-    Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
+    Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
+    // Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
     if (!secondComputeProgram->isInitialised)
     {
@@ -181,20 +181,20 @@ Application::Application(int width, int height, const char *title)
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     this->m_framebuffer = framebuffer;
 
-    // Domain wall
+    // // Domain wall
+    // SimulationLayout simulationLayout = {
+    //     {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+    //     {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
+
+    // Single axion
     SimulationLayout simulationLayout = {
         {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
-        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
-
-    // // Single axion
-    // SimulationLayout simulationLayout = {
-    //     {UniformDataType::FLOAT, std::string("eta"), 0.0f, 10.0f},
-    //     {UniformDataType::FLOAT, std::string("lam"), 0.1f, 10.0f},
-    //     {UniformDataType::FLOAT, std::string("colorAnomaly"), 0.1f, 10.0f},
-    //     {UniformDataType::FLOAT, std::string("axionStrength"), 0.1f, 10.0f},
-    //     {UniformDataType::FLOAT, std::string("growthScale"), 0.1f, 1000.0f},
-    //     {UniformDataType::FLOAT, std::string("growthLaw"), 1.0f, 7.0f},
-    // };
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f},
+        {UniformDataType::INT, std::string("colorAnomaly"), (int)3, (int)1, (int)10},
+        {UniformDataType::FLOAT, std::string("axionStrength"), 0.025f, 0.1f, 5.0f},
+        {UniformDataType::FLOAT, std::string("growthScale"), 75.0f, 50.0f, 100.0f},
+        {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
+    };
 
     this->m_simulation = new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
 
@@ -240,6 +240,7 @@ void Application::run()
         // 1. Frame rate limited update
         double now = glfwGetTime();
         double updateDelta = now - m_lastUpdateTime;
+        m_tickRate = 1.0f / updateDelta;
         double frameDelta = now - m_lastFrameTime;
         if ((now - m_lastFrameTime) >= m_fpsLimit)
         {
@@ -276,6 +277,7 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // UPDATE SIMULATION
     m_simulation->update();
 
     m_textureProgram->use();
@@ -358,6 +360,9 @@ void Application::onImGuiRender()
     if (ImGui::Begin("Left Hand Window"))
     {
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_imguiIO->Framerate, m_imguiIO->Framerate);
+
+        // Show update speed
+        ImGui::Text("Simulation average %.3f ms/tick (%.1f TPS)", 1000.0f / m_tickRate, m_tickRate);
     }
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
@@ -385,6 +390,7 @@ void Application::endImGuiFrame()
 
 void Application::onUpdate()
 {
+    // m_simulation->update();
 }
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height)

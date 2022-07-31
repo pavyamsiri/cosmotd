@@ -28,7 +28,7 @@ void main() {
     // Potential derivative
     nextAcceleration -= lam * (pow(nextValue, 2)  - pow(eta, 2)) * nextValue;
 
-    float nextVelocity = currentVelocity + 0.5f * (acceleration + nextAcceleration) * pow(dt, 2);
+    float nextVelocity = currentVelocity + 0.5f * (acceleration + nextAcceleration) * dt;
 
 
     imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, nextTime));

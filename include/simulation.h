@@ -103,7 +103,8 @@ public:
                 floatUniforms.push_back(element.startValue.floatStartValue);
                 break;
             case UniformDataType::INT:
-                intUniforms.push_back(element.startValue.intStartValue);
+                // TODO: For some reason, integer values always get interpreted as floats and so we need to cast into integer.
+                intUniforms.push_back((int)element.startValue.floatStartValue);
                 break;
             // TODO: Vectors might have different initial values. How do we encode that though?
             case UniformDataType::INT2:

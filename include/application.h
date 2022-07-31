@@ -50,6 +50,8 @@ private:
     double m_lastUpdateTime = 0.0f;
     double m_lastFrameTime = 0.0f;
 
+    double m_tickRate = 0.0f;
+
     // Frame rate
     double m_fpsLimit = 1.0f / 60.0f;
 

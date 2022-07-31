@@ -39,7 +39,7 @@ void main() {
     // Potential derivative
     realNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * realNextValue;
 
-    float realNextVelocity = realCurrentVelocity + 0.5f * (realAcceleration + realNextAcceleration) * pow(dt, 2);
+    float realNextVelocity = realCurrentVelocity + 0.5f * (realAcceleration + realNextAcceleration) * dt;
 
 
     imageStore(realFieldTexture, realPos, vec4(realNextValue, realNextVelocity, realNextAcceleration, realNextTime));
@@ -51,7 +51,7 @@ void main() {
     // Potential derivative
     imagNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * imagNextValue;
 
-    float imagNextVelocity = imagCurrentVelocity + 0.5f * (imagAcceleration + imagNextAcceleration) * pow(dt, 2);
+    float imagNextVelocity = imagCurrentVelocity + 0.5f * (imagAcceleration + imagNextAcceleration) * dt;
 
 
     imageStore(imagFieldTexture, imagPos, vec4(imagNextValue, imagNextVelocity, imagNextAcceleration, imagNextTime));
