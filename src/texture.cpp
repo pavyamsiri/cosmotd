@@ -18,9 +18,7 @@ Texture2D::Texture2D()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // Log
-    std::stringstream debugStream;
-    debugStream << "Created Texture2D with ID " << textureID;
-    logDebug(debugStream.str().c_str());
+    logDebug("Created Texture2D with ID %d", textureID);
 }
 
 void Texture2D::bind(uint32_t target)
@@ -37,9 +35,7 @@ void Texture2D::release()
 {
     glDeleteTextures(1, &textureID);
     // Log
-    std::stringstream traceStream;
-    traceStream << "Deleted Texture2D with ID " << textureID;
-    logDebug(traceStream.str().c_str());
+    logDebug("Deleted Texture2D with ID %d", textureID);
 }
 
 const void Texture2D::saveField(const char *filePath) const
@@ -88,18 +84,12 @@ const void Texture2D::saveField(const char *filePath) const
             }
         }
 
-        // Current time
-        std::stringstream timeStream;
-        timeStream << "Current time = " << textureData[3];
-        logTrace(timeStream.str().c_str());
         dataFile.close();
         logTrace("Successfully wrote field data to binary file!");
     }
     catch (std::ifstream::failure &e)
     {
-        std::stringstream errorStream;
-        errorStream << "Failed to open file to write to at path: " << filePath << " - " << e.what();
-        logError(errorStream.str().c_str());
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
     }
 }
 
@@ -173,9 +163,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
     }
     catch (std::ifstream::failure &e)
     {
-        std::stringstream errorStream;
-        errorStream << "Failed to read data from file at path: " << filePath << " - " << e.what();
-        logError(errorStream.str().c_str());
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
 
         return std::vector<std::shared_ptr<Texture2D>>();
     }

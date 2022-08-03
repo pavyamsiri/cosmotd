@@ -12,9 +12,7 @@ int validateShaderProgramLinking(uint32_t programID)
     if (!success)
     {
         glGetProgramInfoLog(programID, 1024, NULL, infoLog);
-        std::stringstream errorStream;
-        errorStream << "Failed to link shader program! - " << infoLog;
-        logError(errorStream.str().c_str());
+        logError("Failed to link shader program! - %s", infoLog);
         return -1;
     }
     return 0;
@@ -46,9 +44,7 @@ VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, S
     // Link success
     if (linkResult == 0)
     {
-        std::stringstream debugStream;
-        debugStream << "Vertex/fragment shader program created with ID " << programID;
-        logDebug(debugStream.str().c_str());
+        logDebug("Vertex/fragment shader program created with ID %d", programID);
         isInitialised = true;
     }
 }
@@ -84,9 +80,7 @@ ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
     // Link success
     if (linkResult == 0)
     {
-        std::stringstream debugStream;
-        debugStream << "Compute shader program created with ID " << programID;
-        logDebug(debugStream.str().c_str());
+        logDebug("Compute shader program created with ID %d", programID);
         isInitialised = true;
     }
 }

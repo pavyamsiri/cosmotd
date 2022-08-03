@@ -42,6 +42,8 @@ public:
             // obj_ is now 0.
             std::swap(textureID, other.textureID);
         }
+
+        return *this;
     }
 
     // Bind and unbind

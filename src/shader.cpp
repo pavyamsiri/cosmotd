@@ -45,9 +45,7 @@ int validateShaderCompilation(uint32_t shaderID)
     if (!success)
     {
         glGetShaderInfoLog(shaderID, 1024, NULL, infoLog);
-        std::stringstream errorStream;
-        errorStream << "Failed to compile shader! - " << infoLog;
-        logError(errorStream.str().c_str());
+        logError("Failed to compile shader! - %s", infoLog);
         return -1;
     }
     else
@@ -76,9 +74,7 @@ Shader::Shader(const char *shaderPath, ShaderType type) : type(type)
     }
     catch (std::ifstream::failure &e)
     {
-        std::stringstream errorStream;
-        errorStream << "Failed to read " << convertShaderTypeToString(type) << " from file! - " << e.what();
-        logError(errorStream.str().c_str());
+        logError("Failed to read %s from file! - ", convertShaderTypeToString(type), e.what());
         return;
     }
 

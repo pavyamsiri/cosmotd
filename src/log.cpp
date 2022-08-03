@@ -1,147 +1,93 @@
 // Standard libraries
 #include <iostream>
+#include <format>
 
 // Internal libraries
-#include <log.h>
+#include "log.h"
+
+constexpr size_t MAX_LOG_SIZE = 32000;
 
 // Windows implemnentation with colored output
 #ifdef _WIN32
 #include <windows.h>
 #include <wincon.h>
 
-void logTrace(const char *message)
+static uint8_t logLevelColors[6] = {
+    FOREGROUND_BLUE,
+    FOREGROUND_GREEN,
+    FOREGROUND_BLUE | FOREGROUND_GREEN,
+    FOREGROUND_GREEN | FOREGROUND_RED,
+    FOREGROUND_RED};
+constexpr uint8_t DEFAULT_COLOR = 7;
+
+void logWithLevel(LogLevel level, const char *messageFormat, ...)
 {
-#ifdef LOG_LEVEL_TRACE
-    const char *tag = "[ TRACE ]: ";
+    static const char *logLevelStrings[6] = {
+        "[ TRACE ]: ",
+        "[ DEBUG ]: ",
+        "[ INFO  ]: ",
+        "[WARNING]: ",
+        "[ ERROR ]: ",
+        "[ FATAL ]: ",
+    };
+
+    char buffer[MAX_LOG_SIZE];
+    memset(buffer, 0, sizeof(buffer));
+
+    __builtin_va_list argPointer;
+    va_start(argPointer, messageFormat);
+    vsnprintf_s(buffer, MAX_LOG_SIZE, messageFormat, argPointer);
+    va_end(argPointer);
+
+    std::stringstream outStream;
+    outStream << logLevelStrings[(size_t)level] << buffer << "\n";
+
     HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-#endif
+    switch (level)
+    {
+    case LogLevel::CTRACE:
+    case LogLevel::CDEBUG:
+    case LogLevel::CINFO:
+    case LogLevel::CWARNING:
+        hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        break;
+    case LogLevel::CERROR:
+    case LogLevel::CFATAL:
+        hConsole = GetStdHandle(STD_ERROR_HANDLE);
+        break;
+    }
+
+    SetConsoleTextAttribute(hConsole, logLevelColors[(size_t)level]);
+    WriteConsoleA(hConsole, outStream.str().c_str(), (DWORD)outStream.str().length(), nullptr, NULL);
+    SetConsoleTextAttribute(hConsole, DEFAULT_COLOR);
 }
 
-void logDebug(const char *message)
+#else
+
+void logWithLevel(LogLevel level, const char *messageFormat, ...)
 {
-#ifdef LOG_LEVEL_DEBUG
-    const char *tag = "[ DEBUG ]: ";
-    HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-#endif
-}
+    static const char *logLevelStrings[6] = {
+        "[ TRACE ]: ",
+        "[ DEBUG ]: ",
+        "[ INFO  ]: ",
+        "[WARNING]: ",
+        "[ ERROR ]: ",
+        "[ FATAL ]: ",
+    };
 
-void logInfo(const char *message)
-{
-#ifdef LOG_LEVEL_INFO
-    const char *tag = "[ INFO  ]: ";
-    HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_BLUE | FOREGROUND_GREEN);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-#endif
-}
+    char buffer[MAX_LOG_SIZE];
+    memset(buffer, 0, sizeof(buffer));
 
-void logWarning(const char *message)
-{
-#ifdef LOG_LEVEL_WARNING
-    const char *tag = "[WARNING]: ";
-    HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-#endif
-}
+    __builtin_va_list argPointer;
+    va_start(argPointer, messageFormat);
+    vsnprintf_s(buffer, MAX_LOG_SIZE, messageFormat, argPointer);
+    va_end(argPointer);
 
-void logError(const char *message)
-{
-#ifdef LOG_LEVEL_ERROR
-    const char *tag = "[ ERROR ]: ";
-    HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_RED);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-#endif
-}
+    std::stringstream outStream;
+    outStream << logLevelStrings[(size_t)level] << buffer << "\n";
 
-void logFatal(const char *message)
-{
-#ifdef LOG_LEVEL_FATAL
-    const char *tag = "[ FATAL ]: ";
-    HANDLE hConsole;
-    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    FlushConsoleInputBuffer(hConsole);
-    SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
-    std::cout << tag << message << std::endl;
-    SetConsoleTextAttribute(hConsole, 7);
-    __debugbreak();
-#endif
-}
-
-// Non-windows implementations
-#elif
-void logTrace(const char *message)
-{
-#ifdef LOG_LEVEL_TRACE
-    const char *tag = "[ TRACE ]: ";
-    std::cout << tag << message << std::endl;
-#endif
-}
-
-void logDebug(const char *message)
-{
-#ifdef LOG_LEVEL_DEBUG
-
-    const char *tag = "[ DEBUG ]: ";
-    std::cout << tag << message << std::endl;
-#endif
-}
-
-void logInfo(const char *message)
-{
-#ifdef LOG_LEVEL_INFO
-
-    const char *tag = "[ INFO  ]: ";
-    std::cout << tag << message << std::endl;
-#endif
-}
-
-void logWarning(const char *message)
-{
-#ifdef LOG_LEVEL_WARNING
-
-    const char *tag = "[WARNING]: ";
-    std::cout << tag << message << std::endl;
-#endif
-}
-
-void logError(const char *message)
-{
-#ifdef LOG_LEVEL_ERROR
-
-    const char *tag = "[ ERROR ]: ";
-    std::cout << tag << message << std::endl;
-#endif
-}
-
-void logFatal(const char *message)
-{
-#ifdef LOG_LEVEL_FATAL
-
-    const char *tag = "[ FATAL ]: ";
-    std::cout << tag << message << std::endl;
-    __debugbreak();
-#endif
+    // Generic cross platform printing
+    std::cout << outStream.str();
 }
 
 #endif

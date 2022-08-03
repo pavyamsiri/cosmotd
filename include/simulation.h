@@ -123,10 +123,10 @@ public:
                 intUniforms.push_back(element.startValue.intStartValue);
                 break;
             default:
-                std::stringstream warningStream;
-                warningStream << "The given uniform data type " << convertUniformDataTypeToString(element.type);
-                warningStream << " for the uniform named " << element.name << " is invalid!";
-                logWarning(warningStream.str().c_str());
+                logWarning(
+                    "The given uniform data type %s for the uniform named %s is invalid!",
+                    convertUniformDataTypeToString(element.type),
+                    element.name.c_str());
                 break;
             }
         }

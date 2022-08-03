@@ -26,7 +26,7 @@ messageCallback(GLenum source,
                 const void *userParam)
 {
     char outMessage[1024];
-    sprintf(outMessage, "OpenGL: type = 0x%x, severity = 0x%x, message = %s",
+    sprintf(outMessage, "OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s",
             type, severity, message);
     if (type == GL_DEBUG_TYPE_ERROR)
     {
