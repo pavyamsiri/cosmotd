@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <vector>
 
+// TODO: Just put a shared ptr on all id values
+
 class Texture2D
 {
 public:
