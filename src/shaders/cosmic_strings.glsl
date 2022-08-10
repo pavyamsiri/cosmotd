@@ -5,54 +5,57 @@ layout(rgba32f, binding = 1) readonly uniform image2D inRealLaplacianTexture;
 layout(rgba32f, binding = 2) restrict uniform image2D imagFieldTexture;
 layout(rgba32f, binding = 3) readonly uniform image2D inImagLaplacianTexture;
 // Universal simulation uniform parameters
-layout(location=0) uniform float dx;
-layout(location=1) uniform float dt;
-layout(location=2) uniform int era;
-// Domain wall specific uniform parameters
-layout(location=3) uniform float eta;
-layout(location=4) uniform float lam;
+layout(location=0) uniform float dt;
+layout(location=1) uniform int era;
+// Cosmic string specific uniform parameters
+layout(location=2) uniform float eta;
+layout(location=3) uniform float lam;
 
 const float ALPHA_2D = 2.0f;
 
 
 void main() {
-    ivec2 realPos = ivec2(gl_GlobalInvocationID.xy);
-    vec4 realField = imageLoad(realFieldTexture, realPos);
+    // Current position
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    // Load the field data
+    vec4 realField = imageLoad(realFieldTexture, pos);
+    vec4 imagField = imageLoad(imagFieldTexture, pos);
+    // Field value
     float realNextValue = realField.r;
-    float realCurrentVelocity = realField.g;
-    float realAcceleration = realField.b;
-    float realNextTime = realField.a;
-
-    ivec2 imagPos = ivec2(gl_GlobalInvocationID.xy);
-    vec4 imagField = imageLoad(imagFieldTexture, imagPos);
     float imagNextValue = imagField.r;
+    // Field velocity
+    float realCurrentVelocity = realField.g;
     float imagCurrentVelocity = imagField.g;
-    float imagAcceleration = imagField.b;
-    float imagNextTime = imagField.a;
+    // Field acceleration
+    float realCurrentAcceleration = realField.b;
+    float imagCurrentAcceleration = imagField.b;
+    // Time
+    float nextTime = realField.a;
 
+    // Square amplitude of complex field
     float squareAmplitude = pow(realNextValue, 2) + pow(imagNextValue, 2);
 
+    // Evolve acceleration of real field
     // Laplacian term
-    float realNextAcceleration = imageLoad(inRealLaplacianTexture, realPos).r;
+    float realNextAcceleration = imageLoad(inRealLaplacianTexture, pos).r;
     // 'Damping' term
-    realNextAcceleration -= ALPHA_2D * (1.0f / realNextTime) * realCurrentVelocity;
+    realNextAcceleration -= ALPHA_2D * (era / nextTime) * realCurrentVelocity;
     // Potential derivative
     realNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * realNextValue;
 
-    float realNextVelocity = realCurrentVelocity + 0.5f * (realAcceleration + realNextAcceleration) * dt;
-
-
-    imageStore(realFieldTexture, realPos, vec4(realNextValue, realNextVelocity, realNextAcceleration, realNextTime));
-
+    // Evolve acceleration of imaginary field
     // Laplacian term
-    float imagNextAcceleration = imageLoad(inImagLaplacianTexture, imagPos).r;
+    float imagNextAcceleration = imageLoad(inImagLaplacianTexture, pos).r;
     // 'Damping' term
-    imagNextAcceleration -= ALPHA_2D * (1.0f / imagNextTime) * imagCurrentVelocity;
+    imagNextAcceleration -= ALPHA_2D * (era / nextTime) * imagCurrentVelocity;
     // Potential derivative
     imagNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * imagNextValue;
 
-    float imagNextVelocity = imagCurrentVelocity + 0.5f * (imagAcceleration + imagNextAcceleration) * dt;
+    // Evolve velocity
+    float realNextVelocity = realCurrentVelocity + 0.5f * (realCurrentAcceleration + realNextAcceleration) * dt;
+    float imagNextVelocity = imagCurrentVelocity + 0.5f * (imagCurrentAcceleration + imagNextAcceleration) * dt;
 
-
-    imageStore(imagFieldTexture, imagPos, vec4(imagNextValue, imagNextVelocity, imagNextAcceleration, imagNextTime));
+    // Store results
+    imageStore(realFieldTexture, pos, vec4(realNextValue, realNextVelocity, realNextAcceleration, nextTime));
+    imageStore(imagFieldTexture, pos, vec4(imagNextValue, imagNextVelocity, imagNextAcceleration, nextTime));
 }

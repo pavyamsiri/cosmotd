@@ -108,15 +108,18 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         dataFile.open(filePath, std::ios::binary);
         // Read header
         dataFile.read(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
-        dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
-        dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+
+        logTrace("Number of fields = %d, M = %d, N=%d", numFields, M, N);
 
         // Create list of textures
-        std::vector<std::shared_ptr<Texture2D>> fields(numFields);
+        std::vector<std::shared_ptr<Texture2D>>
+            fields(numFields);
 
         // Read data
         for (int fieldIndex = 0; fieldIndex < numFields; fieldIndex++)
         {
+            dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
+            dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
             std::vector<float> textureData(M * N * 4);
             for (int rowIndex = 0; rowIndex < M; rowIndex++)
             {
@@ -138,12 +141,11 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
                     // Blue channel - field accleration
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = fieldAcceleration;
                     // TODO: Having the alpha channel store time is pretty hacky and should be removed. It should just be a
-                    // uniform.
+                    // uniform. A uniform can't be written to so a buffer?
                     // Alpha channel - current time
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 3] = 0.1f;
                 }
             }
-
             fields[fieldIndex] = std::shared_ptr<Texture2D>(new Texture2D());
             fields[fieldIndex]->width = N;
             fields[fieldIndex]->height = M;
@@ -155,6 +157,8 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
             glTextureStorage2D(fields[fieldIndex]->textureID, 1, GL_RGBA32F, N, M);
             glBindImageTexture(0, fields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+            textureData.clear();
         }
 
         dataFile.close();

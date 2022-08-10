@@ -71,6 +71,9 @@ public:
 class Simulation
 {
 public:
+    // Run flag
+    bool runFlag = false;
+
     Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *laplacianPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
         : firstPass(firstPass), laplacianPass(laplacianPass), secondPass(secondPass), layout(layout)
     {
@@ -144,6 +147,9 @@ public:
     Texture2D *getRenderTexture(uint32_t fieldIndex);
     Texture2D *getCurrentRenderTexture();
 
+    float getCurrentSimulationTime();
+    int getCurrentSimulationTimestep();
+
 private:
     // Field data
     std::vector<std::shared_ptr<Texture2D>> originalFields;
@@ -156,8 +162,10 @@ private:
     // Universal parameters
     float dx = 1.0f;
     float dt = 0.1f;
-    float alpha = 2.0f;
     int era = 1;
+
+    // Keep track of time
+    int timestep = 0;
 
     // Extra simulation parameters that are non-specific
     SimulationLayout layout;
@@ -165,9 +173,6 @@ private:
     // Uniforms
     std::vector<float> floatUniforms;
     std::vector<int32_t> intUniforms;
-
-    // Run flag
-    bool runFlag = false;
 
     // Render field index
     int32_t renderIndex = 0;

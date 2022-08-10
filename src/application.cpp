@@ -95,6 +95,7 @@ Application::Application(int width, int height, const char *title)
         return;
     }
     Shader *fragmentShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
+    // Shader *fragmentShader = new Shader("shaders/plot_field.glsl", ShaderType::FRAGMENT_SHADER);
     // Shader *fragmentShader = new Shader("shaders/texture_fragment.glsl", ShaderType::FRAGMENT_SHADER);
     if (!fragmentShader->isInitialised)
     {
@@ -161,6 +162,27 @@ Application::Application(int width, int height, const char *title)
         // Bottom right - UV
         1.0f, 1.0f};
 
+    float verticesRIGHTSIDEUP[] = {
+        // Top left -  screen coordinates
+        -1.0f, +1.0f,
+        // Top left - UV
+        0.0f, 1.0f,
+
+        // Top right -  screen coordinates
+        +1.0f, +1.0f,
+        // Top right - UV
+        1.0f, 1.0f,
+
+        // Bottom left -  screen coordinates
+        -1.0f, -1.0f,
+        // Bottom left - UV
+        0.0f, 0.0f,
+
+        // Bottom right -  screen coordinates
+        1.0f, -1.0f,
+        // Bottom right - UV
+        1.0f, 0.0f};
+
     uint32_t indices[] = {
         1, 3, 0, // first triangle
         3, 2, 0  // second triangle
@@ -168,6 +190,7 @@ Application::Application(int width, int height, const char *title)
 
     VertexBufferLayout layout = {{BufferElementType::FLOAT2, false}, {BufferElementType::FLOAT2, true}};
 
+    // VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
     VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
     IndexBuffer *indexBuffer = new IndexBuffer(indices, 6, BufferUsageType::STATIC_DRAW);
 
@@ -181,7 +204,7 @@ Application::Application(int width, int height, const char *title)
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     this->m_framebuffer = framebuffer;
 
-    // // Domain wall
+    // Domain wall
     // SimulationLayout simulationLayout = {
     //     {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
     //     {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
@@ -198,11 +221,12 @@ Application::Application(int width, int height, const char *title)
 
     this->m_simulation = new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
 
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/vertical_strip.ctdd"));
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/image_test.ctdd"));
     // m_simulation->setField(Texture2D::loadFromCTDDFile("data/laplacian_test.ctdd"));
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
-    m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np489744.ctdd"));
+    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np16579.ctdd"));
+    m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
 
+    // m_colorMap = Texture2D::loadFromCTDDFile("colormaps/viridis_colormap.ctdd")[0];
     m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
 
     // Initialisation complete
@@ -240,21 +264,30 @@ void Application::run()
         // 1. Frame rate limited update
         double now = glfwGetTime();
         double updateDelta = now - m_lastUpdateTime;
-        m_tickRate = 1.0f / updateDelta;
         double frameDelta = now - m_lastFrameTime;
-        if ((now - m_lastFrameTime) >= m_fpsLimit)
+        double simulationUpdateDelta = now - m_lastSimUpdateTime;
+        m_tickRate = 1.0f / simulationUpdateDelta;
+        if ((now - m_lastFrameTime) >= (1.0f / m_fpsLimit))
         {
+            // Scene rendering
+            Application::onRender();
             // UI rendering
             Application::beginImGuiFrame();
             Application::onImGuiRender();
             Application::endImGuiFrame();
-            // Scene rendering
-            Application::onRender();
             // Swap image buffer
             glfwSwapBuffers(m_windowHandle);
 
             // Update time of last frame
             m_lastFrameTime = now;
+        }
+
+        if ((now - m_lastSimUpdateTime) >= (1.0f / m_simulationFPS))
+        {
+            // 3. Simulation update
+            Application::onSimulationUpdate();
+
+            m_lastSimUpdateTime = now;
         }
 
         // 2. Frame rate unlimited update
@@ -277,16 +310,14 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // UPDATE SIMULATION
-    m_simulation->update();
-
     m_textureProgram->use();
     // Bind uniforms here
     // glUniform1f(0, 1.0f);
-    // Texture2D *renderTexture = m_simulation->getCurrentRenderTexture();
     m_colorMap->bind(0);
     m_simulation->getRenderTexture(0)->bind(1);
     m_simulation->getRenderTexture(1)->bind(2);
+    // m_simulation->getCurrentRenderTexture()->bind(1);
+    // m_simulation->getCurrentRenderTexture()->bind(0);
 
     // Bind VAO
     m_mainViewportVertexArray->bind();
@@ -338,8 +369,10 @@ void Application::beginImGuiFrame()
     ImGui::PopStyleVar();
 
     if (opt_fullscreen)
+    {
         // Pop the two style variables set earlier if in full screen mode
         ImGui::PopStyleVar(2);
+    }
 
     // DockSpace
     ImGuiIO &io = ImGui::GetIO();
@@ -363,11 +396,22 @@ void Application::onImGuiRender()
 
         // Show update speed
         ImGui::Text("Simulation average %.3f ms/tick (%.1f TPS)", 1000.0f / m_tickRate, m_tickRate);
+
+        // Change simulation speed
+        ImGui::SliderFloat("Simulation FPS", &m_simulationFPS, 1.0f, 1000.0f);
+
+        // Current simulation time
+        ImGui::Text("Simulation time %f", m_simulation->getCurrentSimulationTime());
+        // Current simulation timestep
+        ImGui::Text("Simulation timestep %d", m_simulation->getCurrentSimulationTimestep());
+
+        // Control the number of timesteps
+        ImGui::InputInt("Max Timesteps", &m_maxTimesteps, 100, 1000);
     }
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
     {
-        ImGui::Text("HELLO");
+        ImGui::Text("Simulation Controls and Parameters");
         m_simulation->onUIRender();
     }
     ImGui::End();
@@ -391,6 +435,15 @@ void Application::endImGuiFrame()
 void Application::onUpdate()
 {
     // m_simulation->update();
+}
+void Application::onSimulationUpdate()
+{
+    if (m_simulation->getCurrentSimulationTimestep() > m_maxTimesteps)
+    {
+        m_simulation->runFlag = false;
+    }
+
+    m_simulation->update();
 }
 
 void framebufferSizeCallback(GLFWwindow *window, int width, int height)

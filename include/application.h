@@ -40,6 +40,8 @@ public:
     void endImGuiFrame();
     // Update method (frame rate independent)
     void onUpdate();
+    // Simulation update method (frame rate determined by user)
+    void onSimulationUpdate();
 
 private:
     GLFWwindow *m_windowHandle = nullptr;
@@ -49,11 +51,14 @@ private:
     // Timing information
     double m_lastUpdateTime = 0.0f;
     double m_lastFrameTime = 0.0f;
+    double m_lastSimUpdateTime = 0.0f;
 
     double m_tickRate = 0.0f;
 
     // Frame rate
-    double m_fpsLimit = 1.0f / 60.0f;
+    float m_fpsLimit = 60.0f;
+    // Simulation frame rate
+    float m_simulationFPS = 60.0f;
 
     // Rendering
     VertexFragmentShaderProgram *m_textureProgram;
@@ -62,4 +67,6 @@ private:
     Simulation *m_simulation;
 
     std::shared_ptr<Texture2D> m_colorMap;
+
+    int m_maxTimesteps = 1000;
 };

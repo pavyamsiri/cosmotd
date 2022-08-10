@@ -24,5 +24,5 @@ void main()
     float interpolationValue = clamp(phaseAngle, -maxValue, +maxValue);
     interpolationValue = (interpolationValue + maxValue) / (2.0f * maxValue);
     interpolationValue = clamp(interpolationValue, 0.0f, 1.0f);
-    outColor = texture(inColorMap, vec2(interpolationValue, 0.25f));
+    outColor = texture(inColorMap, vec2(interpolationValue, 0.5f));
 }

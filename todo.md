@@ -18,21 +18,25 @@ the simulation with the saved fields. Can't be done because arrays diverge sligh
     - It should be able to start, stop, restart, save and load.
         - [x] Start button to start simulation.
         - [x] Stop button to stop simulation.
-        - [ ] Restart button to reset simulation back to original state.
-        - [ ] Save button to save field configuration as a .ctdd file (file dialogs?).
-        - [ ] Load button to load field configuration from a .ctdd file (file dialogs?).
+        - [x] Restart button to reset simulation back to original state.
+        - [x] Save button to save field configuration as a .ctdd file (file dialogs?).
+        - [x] Load button to load field configuration from a .ctdd file (file dialogs?).
 
 ## Discussion Points ##
 
-- I noticed a bug in the python version, the velocity update code used dt instead of dt^2.
-    - Since changing that I noticed that the evolution has changed.
-        - Most of the time, the evolution is just slower but not too different.
-        - Single and companion axion simulations seem to be different however. Can run some parameters are bit higher i.e.
-            the K value.
-- Tested the C++ version against the python version by using the same starting conditions.
-    - Results differed. C++ does not seem to dissipate and gets locked into a stable configuration (or at least evolution is so
-    slow that it is imperceivable).
-    - Tried to develop tests for python version to ensure consistency.
-        - Tests were unsuccessful because the floats in the arrays diverged despite evolution being deterministic.
-            - File saving and loading seems to work fine though. Tried the test on a calibration file.
-- Having trouble with simulation code when changing some things. Weird behaviour on the new architecture.
+- Fixed the cosmic string simulation.
+- Problems with the single axion simulation. Probably due to the inaccuracy/stability of the atan.
+    - Simulations seem to be blow up in the C++ version despite being stable in the python version.
+- Test images can be seen in:
+    - "single_axion_target_seed1897198.png": The python version's result after running for 4000 timesteps with the following
+    parameters:
+        - lam = 10, color_anomaly = 4, K = 0.025, t0 = 75, growth = 2
+    - "single_axion_cpp_seed1897198.png": The C++ version's result after running for 4000 timesteps with same parameters as above.
+
+- Interesting things to note with the images:
+    - The white regions are basically non-existent in the C++ version. There should be 4 distinct domains equal to 0, pi/2, -pi/2
+    and pi i.e. white, red, blue and black. There are 4 colours in the C++ version but its 2 shades of red and 2 shades of blue.
+        - Maybe save the field and check in the python notebook whether it looks correct/the domains are actually like that.
+
+- Ideas to test/diagnose the bug. Hardcode the python version i.e. don't use potential_derivative_single_axion_*, and just write
+the potential derivative directly into the evolve_acceleration function.
