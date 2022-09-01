@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <imgui.h>
 #include <sstream>
+#include <fstream>
 #include <cmath>
 
 #include "simulation.h"
@@ -35,6 +36,13 @@ const char *convertUniformDataTypeToString(UniformDataType type)
     default:
         return "UNKNOWN";
     }
+}
+
+Simulation::~Simulation()
+{
+    delete firstPass;
+    delete laplacianPass;
+    delete secondPass;
 }
 
 void Simulation::update()
@@ -346,26 +354,7 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
-    ImGui::Checkbox("Show Laplacian", &laplacianFlag);
     ImGui::Checkbox("Running", &runFlag);
-    if (ImGui::Button("Save fields"))
-    {
-        int fieldNumber = 0;
-        for (const auto &currentField : fields)
-        {
-            std::stringstream outStream;
-            outStream << "data/saved_field_part" << fieldNumber << ".ctdd";
-            currentField.saveField(outStream.str().c_str());
-
-            fieldNumber++;
-        }
-    }
-    if (ImGui::Button("Load fields"))
-    {
-        std::vector<std::shared_ptr<Texture2D>> loadedTextures = Texture2D::loadFromCTDDFile("data/saved_field.ctdd");
-        setField(loadedTextures);
-        originalFields = loadedTextures;
-    }
 
     // Reset button
     if (ImGui::Button("Reset field"))
@@ -489,12 +478,9 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
     // Reset timestep
     timestep = 0;
 
-    // Resize vector if necessary
-    if (startFields.size() > fields.size())
-    {
-        fields.resize(startFields.size());
-        laplacians.resize(startFields.size());
-    }
+    // Resize vector to be the same
+    fields.resize(startFields.size());
+    laplacians.resize(startFields.size());
     // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
     // reset to the original field.
     originalFields = std::vector<std::shared_ptr<Texture2D>>(startFields);
@@ -517,8 +503,11 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
             fields[fieldIndex].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             width, height, 1);
 
-        if (laplacians[fieldIndex].width != width && laplacians[fieldIndex].height != height)
+        if (laplacians[fieldIndex].width != width || laplacians[fieldIndex].height != height)
         {
+            // Create new texture because old texture is of the wrong size
+            laplacians[fieldIndex] = Texture2D();
+
             glBindTexture(GL_TEXTURE_2D, laplacians[fieldIndex].textureID);
             glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, width, height);
             laplacians[fieldIndex].width = width;
@@ -529,6 +518,57 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
     }
 }
 
+void Simulation::saveFields(const char *filePath)
+{
+    std::ofstream dataFile;
+    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        uint32_t numFields = fields.size();
+
+        dataFile.open(filePath, std::ios::binary);
+        // Write header
+        dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
+
+        // Read data
+        for (const auto &currentField : fields)
+        {
+            glBindTexture(GL_TEXTURE_2D, currentField.textureID);
+            int M, N;
+            int miplevel = 0;
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
+            dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+
+            std::vector<float> textureData(M * N * 4);
+
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(textureData.data()));
+            glBindTexture(GL_TEXTURE_2D, 0);
+            for (int rowIndex = 0; rowIndex < M; rowIndex++)
+            {
+                for (int columnIndex = 0; columnIndex < N; columnIndex++)
+                {
+                    size_t currentIndex = (rowIndex * 4 * N) + 4 * columnIndex;
+                    float fieldValue = textureData[currentIndex + 0];
+                    float fieldVelocity = textureData[currentIndex + 1];
+                    float fieldAcceleration = textureData[currentIndex + 2];
+                    dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
+                }
+            }
+        }
+
+        dataFile.close();
+        logTrace("Successfully wrote field data to binary file!");
+    }
+    catch (std::ifstream::failure &e)
+    {
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
+    }
+}
+
 Texture2D *Simulation::getRenderTexture(uint32_t fieldIndex)
 {
     return &fields[fieldIndex];
@@ -536,15 +576,12 @@ Texture2D *Simulation::getRenderTexture(uint32_t fieldIndex)
 
 Texture2D *Simulation::getCurrentRenderTexture()
 {
-    // if (laplacianFlag)
-    // {
-    //     return &laplacians[renderIndex];
-    // }
-    // else
-    // {
-    //     return &fields[renderIndex];
-    // }
     return &fields[renderIndex];
+}
+
+Texture2D *Simulation::getCurrentLaplacian()
+{
+    return &laplacians[renderIndex];
 }
 
 float Simulation::getCurrentSimulationTime()
@@ -555,4 +592,154 @@ float Simulation::getCurrentSimulationTime()
 int Simulation::getCurrentSimulationTimestep()
 {
     return timestep;
+}
+
+Simulation *Simulation::createDomainWallSimulation()
+{
+    // Set up compute shader
+    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    if (!firstComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
+    if (!laplacianComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+    if (!secondComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+
+    delete firstComputeShader;
+    delete laplacianComputeShader;
+    delete secondComputeShader;
+
+    // Domain wall
+    SimulationLayout simulationLayout = {
+        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
+
+    return new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+}
+
+Simulation *Simulation::createCosmicStringSimulation()
+{
+    // Set up compute shader
+    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    if (!firstComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
+    if (!laplacianComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+    if (!secondComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+
+    delete firstComputeShader;
+    delete laplacianComputeShader;
+    delete secondComputeShader;
+
+    // Cosmic string
+    SimulationLayout simulationLayout = {
+        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
+
+    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+}
+
+Simulation *Simulation::createSingleAxionSimulation()
+{
+    // Set up compute shader
+    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    if (!firstComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
+    if (!laplacianComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+    if (!secondComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+
+    delete firstComputeShader;
+    delete laplacianComputeShader;
+    delete secondComputeShader;
+
+    // Single axion
+    SimulationLayout simulationLayout = {
+        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f},
+        {UniformDataType::INT, std::string("colorAnomaly"), (int)3, (int)1, (int)10},
+        {UniformDataType::FLOAT, std::string("axionStrength"), 0.025f, 0.1f, 5.0f},
+        {UniformDataType::FLOAT, std::string("growthScale"), 75.0f, 50.0f, 100.0f},
+        {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
+    };
+
+    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+}
+
+Simulation *Simulation::createCompanionAxionSimulation()
+{
+    // Set up compute shader
+    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
+    if (!firstComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
+    if (!laplacianComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *secondComputeShader = new Shader("shaders/companion_axion.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
+    if (!secondComputeProgram->isInitialised)
+    {
+        return nullptr;
+    }
+
+    delete firstComputeShader;
+    delete laplacianComputeShader;
+    delete secondComputeShader;
+
+    // Single axion
+    SimulationLayout simulationLayout = {
+        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f},
+        {UniformDataType::FLOAT, std::string("axionStrength"), 0.025f, 0.1f, 5.0f},
+        {UniformDataType::FLOAT, std::string("kappa"), 0.04f, 0.001f, 1.0f},
+        {UniformDataType::FLOAT, std::string("growthScale"), 75.0f, 50.0f, 100.0f},
+        {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
+        {UniformDataType::FLOAT, std::string("n"), 3.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("nPrime"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("m"), 1.0f, 0.0f, 10.0f},
+        {UniformDataType::FLOAT, std::string("mPrime"), 1.0f, 0.0f, 10.0f},
+    };
+
+    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
 }

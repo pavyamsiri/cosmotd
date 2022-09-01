@@ -23,6 +23,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 # Add the glfw subdirectory. Subdirectories have their own CMakeLists.txt.
 add_subdirectory(external/glfw)
+add_subdirectory(external/nativefiledialog-extended)
 
 # Create an executable with main.cpp as its entry point. glad.c is also to be added as a source file.
 add_executable(cosmotd
@@ -55,6 +56,7 @@ target_include_directories(cosmotd PRIVATE
 
 # Specify the libraries for the linker to the target
 target_link_libraries(cosmotd PRIVATE glfw) # Not entirely sure what PRIVATE means
+target_link_libraries(cosmotd PRIVATE nfd)
 
 # Copy over shaders folder
 add_custom_target(copy_shaders

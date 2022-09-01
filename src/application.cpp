@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <nfd.h>
 
 // Internal libraries
 #include "application.h"
@@ -94,51 +95,34 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    Shader *fragmentShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
-    // Shader *fragmentShader = new Shader("shaders/plot_field.glsl", ShaderType::FRAGMENT_SHADER);
-    // Shader *fragmentShader = new Shader("shaders/texture_fragment.glsl", ShaderType::FRAGMENT_SHADER);
-    if (!fragmentShader->isInitialised)
+    Shader *plotFieldShader = new Shader("shaders/plot_field.glsl", ShaderType::FRAGMENT_SHADER);
+    if (!plotFieldShader->isInitialised)
+    {
+        return;
+    }
+    Shader *plotPhaseShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
+    if (!plotPhaseShader->isInitialised)
     {
         return;
     }
     // 2. Create shader program
-    int programLinkingResult;
-    VertexFragmentShaderProgram *textureProgram = new VertexFragmentShaderProgram(vertexShader, fragmentShader);
-    if (!textureProgram->isInitialised)
+    VertexFragmentShaderProgram *plotFieldProgram = new VertexFragmentShaderProgram(vertexShader, plotFieldShader);
+    if (!plotFieldProgram->isInitialised)
     {
         return;
     }
+    VertexFragmentShaderProgram *plotPhaseProgram = new VertexFragmentShaderProgram(vertexShader, plotPhaseShader);
+    if (!plotPhaseProgram->isInitialised)
+    {
+        return;
+    }
+
+    this->m_plotFieldProgram = plotFieldProgram;
+    this->m_plotPhaseProgram = plotPhaseProgram;
 
     delete vertexShader;
-    delete fragmentShader;
-
-    // Set up compute shader
-    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
-    if (!firstComputeProgram->isInitialised)
-    {
-        return;
-    }
-    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
-    if (!laplacianComputeProgram->isInitialised)
-    {
-        return;
-    }
-    // Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
-    Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
-    // Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
-    if (!secondComputeProgram->isInitialised)
-    {
-        return;
-    }
-
-    delete firstComputeShader;
-    delete laplacianComputeShader;
-    delete secondComputeShader;
-
-    this->m_textureProgram = textureProgram;
+    delete plotFieldShader;
+    delete plotPhaseShader;
 
     // Vertex array
     float vertices[] = {
@@ -190,7 +174,6 @@ Application::Application(int width, int height, const char *title)
 
     VertexBufferLayout layout = {{BufferElementType::FLOAT2, false}, {BufferElementType::FLOAT2, true}};
 
-    // VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
     VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
     IndexBuffer *indexBuffer = new IndexBuffer(indices, 6, BufferUsageType::STATIC_DRAW);
 
@@ -204,34 +187,18 @@ Application::Application(int width, int height, const char *title)
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
     this->m_framebuffer = framebuffer;
 
-    // Domain wall
-    // SimulationLayout simulationLayout = {
-    //     {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
-    //     {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
+    this->m_simulation = Simulation::createDomainWallSimulation();
 
-    // Single axion
-    SimulationLayout simulationLayout = {
-        {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
-        {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f},
-        {UniformDataType::INT, std::string("colorAnomaly"), (int)3, (int)1, (int)10},
-        {UniformDataType::FLOAT, std::string("axionStrength"), 0.025f, 0.1f, 5.0f},
-        {UniformDataType::FLOAT, std::string("growthScale"), 75.0f, 50.0f, 100.0f},
-        {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
-    };
-
-    this->m_simulation = new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
-
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/image_test.ctdd"));
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/laplacian_test.ctdd"));
-    // m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np16579.ctdd"));
     m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
 
-    // m_colorMap = Texture2D::loadFromCTDDFile("colormaps/viridis_colormap.ctdd")[0];
     m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
 
     // Initialisation complete
     this->isInitialised = true;
     logDebug("Application initialisation completed successfully!");
+
+    // Initialise file dialog system
+    NFD_Init();
 
     return;
 }
@@ -245,13 +212,18 @@ Application::~Application()
     ImGui::DestroyContext();
 
     // De-allocate
-    delete m_textureProgram;
+    delete m_plotFieldProgram;
+    delete m_plotPhaseProgram;
     delete m_mainViewportVertexArray;
+    delete m_simulation;
 
     // Terminate
     glfwTerminate();
 
     logDebug("Application cleanup completed successfully!");
+
+    // Quit file dialog system
+    NFD_Quit();
 }
 
 void Application::run()
@@ -310,14 +282,27 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    m_textureProgram->use();
-    // Bind uniforms here
-    // glUniform1f(0, 1.0f);
-    m_colorMap->bind(0);
-    m_simulation->getRenderTexture(0)->bind(1);
-    m_simulation->getRenderTexture(1)->bind(2);
-    // m_simulation->getCurrentRenderTexture()->bind(1);
-    // m_simulation->getCurrentRenderTexture()->bind(0);
+    if (m_currentPlottingProcedureIndex == 0 || m_simulation->fields.size() < 2)
+    {
+        m_plotFieldProgram->use();
+        glUniform1f(0, 1.0f);
+        m_colorMap->bind(0);
+        if (m_showLaplacian)
+        {
+            m_simulation->getCurrentLaplacian()->bind(1);
+        }
+        else
+        {
+            m_simulation->getCurrentRenderTexture()->bind(1);
+        }
+    }
+    else if (m_currentPlottingProcedureIndex == 1)
+    {
+        m_plotPhaseProgram->use();
+        m_colorMap->bind(0);
+        m_simulation->getRenderTexture(0)->bind(1);
+        m_simulation->getRenderTexture(1)->bind(2);
+    }
 
     // Bind VAO
     m_mainViewportVertexArray->bind();
@@ -411,7 +396,147 @@ void Application::onImGuiRender()
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
     {
+        // File dialogs
+        if (ImGui::Button("Open file"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, NULL);
+            if (result == NFD_OKAY)
+            {
+                std::vector<std::shared_ptr<Texture2D>> loadedTextures = Texture2D::loadFromCTDDFile(outPath);
+                logTrace("The new ctdd contains %d fields", loadedTextures.size());
+                m_simulation->setField(loadedTextures);
+                m_simulation->originalFields = loadedTextures;
+                m_simulation->originalFields.resize(loadedTextures.size());
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling open file dialog...");
+            }
+            else
+            {
+                logError("Open file dialog error: %s", NFD_GetError());
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save as"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, nullptr);
+            if (result == NFD_OKAY)
+            {
+                m_simulation->saveFields(outPath);
+                logDebug("Saving field at path %s", outPath);
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling save file dialog...");
+            }
+            else
+            {
+                logError("Save file dialog error: %s", NFD_GetError());
+            }
+        }
+
+        // Change colormap
+        if (ImGui::Button("Change colormap"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, NULL);
+            if (result == NFD_OKAY)
+            {
+                m_colorMap = Texture2D::loadFromCTDDFile(outPath)[0];
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling open file dialog...");
+            }
+            else
+            {
+                logError("Open file dialog error: %s", NFD_GetError());
+            }
+        }
+
+        const char *availablePlottingProcedures[] = {"Field", "Phase"};
+
+        if (ImGui::BeginCombo("Plotting", m_currentPlottingProcedure))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(availablePlottingProcedures); n++)
+            {
+                bool isSelected = (m_currentPlottingProcedure == availablePlottingProcedures[n]);
+                if (ImGui::Selectable(availablePlottingProcedures[n], isSelected))
+                {
+                    m_currentPlottingProcedure = availablePlottingProcedures[n];
+                    m_currentPlottingProcedureIndex = n;
+                }
+                if (isSelected)
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        const char *availableSimulationProcedures[] = {"Domain walls", "Cosmic strings", "Single axion", "Companion axion"};
+
+        if (ImGui::BeginCombo("Simulation Type", m_currentSimulationProcedure))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(availableSimulationProcedures); n++)
+            {
+                bool isSelected = (m_currentSimulationProcedure == availableSimulationProcedures[n]);
+                if (ImGui::Selectable(availableSimulationProcedures[n], isSelected))
+                {
+                    m_currentSimulationProcedure = availableSimulationProcedures[n];
+
+                    // Set new simulation
+                    delete m_simulation;
+                    if (n == 0)
+                    {
+                        m_simulation = Simulation::createDomainWallSimulation();
+                        // Set field
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
+                    }
+                    else if (n == 1)
+                    {
+                        m_simulation = Simulation::createCosmicStringSimulation();
+                        // Set field
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np16579.ctdd"));
+                    }
+                    else if (n == 2)
+                    {
+                        m_simulation = Simulation::createSingleAxionSimulation();
+                        // Set field
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
+                    }
+                    else if (n == 3)
+                    {
+                        m_simulation = Simulation::createCompanionAxionSimulation();
+                        // Set field
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
+                    }
+                }
+                if (isSelected)
+                {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
         ImGui::Text("Simulation Controls and Parameters");
+        ImGui::Checkbox("Show Laplacian", &m_showLaplacian);
         m_simulation->onUIRender();
     }
     ImGui::End();
@@ -438,7 +563,7 @@ void Application::onUpdate()
 }
 void Application::onSimulationUpdate()
 {
-    if (m_simulation->getCurrentSimulationTimestep() > m_maxTimesteps)
+    if (m_simulation->getCurrentSimulationTimestep() >= m_maxTimesteps)
     {
         m_simulation->runFlag = false;
     }

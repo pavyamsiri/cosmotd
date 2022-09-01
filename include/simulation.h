@@ -73,6 +73,8 @@ class Simulation
 public:
     // Run flag
     bool runFlag = false;
+    std::vector<std::shared_ptr<Texture2D>> originalFields;
+    std::vector<Texture2D> fields;
 
     Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *laplacianPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
         : firstPass(firstPass), laplacianPass(laplacianPass), secondPass(secondPass), layout(layout)
@@ -138,6 +140,9 @@ public:
 
     void setField(std::vector<std::shared_ptr<Texture2D>> startFields);
 
+    void saveFields(const char *filePath);
+    void savePhase(const char *filePath);
+
     void update();
 
     void bindUniforms();
@@ -146,18 +151,23 @@ public:
 
     Texture2D *getRenderTexture(uint32_t fieldIndex);
     Texture2D *getCurrentRenderTexture();
+    Texture2D *getCurrentLaplacian();
 
     float getCurrentSimulationTime();
     int getCurrentSimulationTimestep();
 
+    static Simulation *createDomainWallSimulation();
+    static Simulation *createCosmicStringSimulation();
+    static Simulation *createSingleAxionSimulation();
+    static Simulation *createCompanionAxionSimulation();
+
 private:
     // Field data
-    std::vector<std::shared_ptr<Texture2D>> originalFields;
-    std::vector<Texture2D> fields;
     std::vector<Texture2D> laplacians;
 
     ComputeShaderProgram *firstPass;
     ComputeShaderProgram *laplacianPass;
+    ComputeShaderProgram *phasePass;
     ComputeShaderProgram *secondPass;
     // Universal parameters
     float dx = 1.0f;
@@ -176,7 +186,4 @@ private:
 
     // Render field index
     int32_t renderIndex = 0;
-
-    // Show laplacian
-    bool laplacianFlag = false;
 };

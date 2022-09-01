@@ -64,23 +64,17 @@ const void Texture2D::saveField(const char *filePath) const
         dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
         dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
 
-        // Create list of textures
-        std::vector<std::shared_ptr<Texture2D>> fields(numFields);
-
         // Read data
-        for (int fieldIndex = 0; fieldIndex < numFields; fieldIndex++)
+        for (int rowIndex = 0; rowIndex < M; rowIndex++)
         {
-            for (int rowIndex = 0; rowIndex < M; rowIndex++)
+            for (int columnIndex = 0; columnIndex < N; columnIndex++)
             {
-                for (int columnIndex = 0; columnIndex < N; columnIndex++)
-                {
-                    float fieldValue = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0];
-                    float fieldVelocity = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1];
-                    float fieldAcceleration = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2];
-                    dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
-                    dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
-                    dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
-                }
+                float fieldValue = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0];
+                float fieldVelocity = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1];
+                float fieldAcceleration = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2];
+                dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
+                dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
+                dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
             }
         }
 
@@ -109,7 +103,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         // Read header
         dataFile.read(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
 
-        logTrace("Number of fields = %d, M = %d, N=%d", numFields, M, N);
+        logTrace("Number of fields = %d", numFields);
 
         // Create list of textures
         std::vector<std::shared_ptr<Texture2D>>
@@ -120,6 +114,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         {
             dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
             dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            logTrace("Field %d - M = %d, N = %d", fieldIndex, M, N);
             std::vector<float> textureData(M * N * 4);
             for (int rowIndex = 0; rowIndex < M; rowIndex++)
             {

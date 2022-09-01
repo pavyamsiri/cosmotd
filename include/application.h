@@ -61,7 +61,8 @@ private:
     float m_simulationFPS = 60.0f;
 
     // Rendering
-    VertexFragmentShaderProgram *m_textureProgram;
+    VertexFragmentShaderProgram *m_plotFieldProgram;
+    VertexFragmentShaderProgram *m_plotPhaseProgram;
     VertexArray *m_mainViewportVertexArray;
 
     Simulation *m_simulation;
@@ -69,4 +70,11 @@ private:
     std::shared_ptr<Texture2D> m_colorMap;
 
     int m_maxTimesteps = 1000;
+
+    const char *m_currentPlottingProcedure = "Phase";
+    size_t m_currentPlottingProcedureIndex = 1;
+
+    const char *m_currentSimulationProcedure = "Domain walls";
+
+    bool m_showLaplacian = false;
 };

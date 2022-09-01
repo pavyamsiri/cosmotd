@@ -18,11 +18,12 @@ layout(location=7) uniform float growthLaw;
 
 const float ALPHA_2D = 2.0f;
 const float PI = 3.1415926535897932384626433832795f;
+const float EPSILON = 0.01f;
 
 float atan2(in float y, in float x)
 {
     bool s = (abs(x) > abs(y));
-    return mix(PI/2.0 - atan(x,y), atan(y,x), s);
+    return mix(atan(y, x), PI/2.0 - atan(x,y), s);
 }
 
 
@@ -47,13 +48,17 @@ void main() {
     // Square amplitude of complex field
     float squareAmplitude = pow(realNextValue, 2) + pow(imagNextValue, 2);
     // Phase
-    float phase = clamp(atan(imagNextValue, realNextValue), -PI, +PI);
+    float phase = atan(imagNextValue, realNextValue);
+    if (isnan(phase)) {
+        phase = 0.0f;
+    }
+    if (isinf(phase)) {
+        phase = 0.0f;
+    }
+    phase = clamp(phase, -PI, PI);
     
     // Axion term in potential derivative bar the field value
-    float axionFactor = 2 * colorAnomaly * axionStrength;
-    axionFactor *= pow(nextTime / growthScale, growthLaw);
-    axionFactor *= sin(colorAnomaly * phase);
-    axionFactor /= squareAmplitude;
+    float axionFactor = 2.0f * colorAnomaly * axionStrength * pow(nextTime / growthScale, growthLaw) * sin(colorAnomaly * phase) / (squareAmplitude + EPSILON);
 
     // Evolve acceleration of real field
     // Laplacian term
@@ -62,8 +67,10 @@ void main() {
     realNextAcceleration -= ALPHA_2D * (era / nextTime) * realCurrentVelocity;
     // Potential derivative
     realNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * realNextValue;
-    // Axion contribution
-    realNextAcceleration -= imagNextValue * axionFactor;
+    if (!isnan(imagNextValue * axionFactor)) {
+        // Axion contribution
+        realNextAcceleration += imagNextValue * axionFactor;
+    }
 
     // Evolve acceleration of imaginary field
     // Laplacian term
@@ -72,8 +79,10 @@ void main() {
     imagNextAcceleration -= ALPHA_2D * (era / nextTime) * imagCurrentVelocity;
     // Potential derivative
     imagNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * imagNextValue;
-    // Axion contribution
-    imagNextAcceleration += realNextValue * axionFactor;
+    if (!isnan(realNextValue * axionFactor)) {
+        // Axion contribution
+        imagNextAcceleration -= realNextValue * axionFactor;
+    }
 
     // Evolve velocity
     float realNextVelocity = realCurrentVelocity + 0.5f * (realCurrentAcceleration + realNextAcceleration) * dt;
