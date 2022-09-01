@@ -7,17 +7,18 @@ layout(rgba32f, binding = 0) restrict uniform image2D fieldTexture;
 // Uniforms: time interval
 layout(location=0) uniform float dt;
 
+// PRS alpha
+const float ALPHA_2D = 2.0f;
+
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 field = imageLoad(fieldTexture, pos);
-    float currentValue = field.r;
-    float currentVelocity = field.g;
+    float nextValue = field.r;
+    float nextVelocity = field.g;
     float currentAcceleration = field.b;
+    float nextAcceleration = field.a;
 
-    // Calculate next field value
-    float nextValue = currentValue + dt * (currentVelocity + 0.5f * currentAcceleration * dt);
-
-    // Update field value
-    imageStore(fieldTexture, pos, vec4(nextValue, currentVelocity, currentAcceleration, 0.0f));
+    // Update acceleration
+    imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, 0.0f));
 }

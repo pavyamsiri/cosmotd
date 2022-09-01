@@ -1,8 +1,12 @@
 #version 460 core
+// Work group specification
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+// In: Field texture
 layout(rgba32f, binding = 0) readonly uniform image2D inFieldTexture;
-layout(rgba32f, binding = 1) writeonly uniform image2D outLaplacianTexture;
-// Universal simulation uniform parameters
+// Out: Laplacian texture
+layout(r32f, binding = 1) writeonly uniform image2D outLaplacianTexture;
+
+// Uniforms: spatial interval
 layout(location=0) uniform float dx;
 
 
@@ -36,10 +40,12 @@ void main() {
     vec4 downTwo = imageLoad(inFieldTexture, downTwoPos);
     vec4 upTwo = imageLoad(inFieldTexture, upTwoPos);
 
+    // Calculate Laplacian
     vec4 laplacian = -60.0f * current;
     laplacian += 16.0f * (leftOne + rightOne + downOne + upOne);
     laplacian -= leftTwo + rightTwo + downTwo + upTwo;
     laplacian /= 12.0f * pow(dx, 2.0f);
 
+    // Store Laplacian
     imageStore(outLaplacianTexture, pos, laplacian);
 }

@@ -1,6 +1,8 @@
 // Standard libraries
 #include <sstream>
 #include <stdio.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 // External libraries
 #include <glad/glad.h>
@@ -17,36 +19,76 @@
 #include "texture.h"
 #include "simulation.h"
 
-void GLAPIENTRY
-messageCallback(GLenum source,
-                GLenum type,
-                GLuint id,
-                GLenum severity,
-                GLsizei length,
-                const GLchar *message,
-                const void *userParam)
+// Vertex array for a fullscreen textured quad
+const float vertices[] = {
+    // Top left -  screen coordinates
+    -1.0f, +1.0f,
+    // Top left - UV
+    0.0f, 0.0f,
+
+    // Top right -  screen coordinates
+    +1.0f, +1.0f,
+    // Top right - UV
+    1.0f, 0.0f,
+
+    // Bottom left -  screen coordinates
+    -1.0f, -1.0f,
+    // Bottom left - UV
+    0.0f, 1.0f,
+
+    // Bottom right -  screen coordinates
+    1.0f, -1.0f,
+    // Bottom right - UV
+    1.0f, 1.0f};
+
+// Index array for a fullscreen textured quad
+const uint32_t indices[] = {
+    1, 3, 0, // first triangle
+    3, 2, 0  // second triangle
+};
+
+// This is a callback that resizes the viewport upon framebuffer resize.
+void framebufferSizeCallback(GLFWwindow *window, int width, int height)
 {
-    char outMessage[1024];
-    sprintf(outMessage, "OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s",
-            type, severity, message);
+    glViewport(0, 0, width, height);
+}
+
+// This is a callback that logs debug or error information coming from OpenGL.
+void GLAPIENTRY messageCallback(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar *message,
+    const void *userParam)
+{
     if (type == GL_DEBUG_TYPE_ERROR)
     {
-        logError(outMessage);
+        logError("OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s", type, severity, message);
     }
+    // Only log debug information that is severe enough
     else if (severity != 0x826b)
     {
-        logDebug(outMessage);
+        logDebug("OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s", type, severity, message);
+    }
+    // These tend to be too verbose
+    else
+    {
+        // logTrace("OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s", type, severity, message);
     }
 }
 
 Application::Application(int width, int height, const char *title)
 {
     logDebug("Initialising application...");
-    // Initialise glfw and specify OpenGL version
+    // Initialise glfw
     glfwInit();
+    // OpenGL Core version 4.6
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
     // Create glfw window
     GLFWwindow *window = glfwCreateWindow(width, height, title, NULL, NULL);
     if (window == NULL)
@@ -55,6 +97,8 @@ Application::Application(int width, int height, const char *title)
         logFatal("Failed to create GLFW window.");
         return;
     }
+
+    // Set context to current window
     glfwMakeContextCurrent(window);
 
     // Set resize callback
@@ -69,7 +113,7 @@ Application::Application(int width, int height, const char *title)
 
     // Set up debugging
     glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(messageCallback, 0);
+    glDebugMessageCallback(messageCallback, nullptr);
 
     // Set up ImGUI
     IMGUI_CHECKVERSION();
@@ -85,11 +129,11 @@ Application::Application(int width, int height, const char *title)
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
-    this->m_windowHandle = window;
-    this->m_imguiIO = &io;
+    // Save window handle and ImGuiIO
+    this->m_WindowHandle = window;
+    this->m_ImGuiIO = &io;
 
-    // Set up shaders
-    // 1. Load text from file
+    // Compile shaders
     Shader *vertexShader = new Shader("shaders/texture_vertex.glsl", ShaderType::VERTEX_SHADER);
     if (!vertexShader->isInitialised)
     {
@@ -100,105 +144,49 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    Shader *plotPhaseShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
-    if (!plotPhaseShader->isInitialised)
-    {
-        return;
-    }
-    // 2. Create shader program
+    // Create shader programs
     VertexFragmentShaderProgram *plotFieldProgram = new VertexFragmentShaderProgram(vertexShader, plotFieldShader);
     if (!plotFieldProgram->isInitialised)
     {
         return;
     }
-    VertexFragmentShaderProgram *plotPhaseProgram = new VertexFragmentShaderProgram(vertexShader, plotPhaseShader);
-    if (!plotPhaseProgram->isInitialised)
-    {
-        return;
-    }
 
-    this->m_plotFieldProgram = plotFieldProgram;
-    this->m_plotPhaseProgram = plotPhaseProgram;
+    // Save shader programs
+    this->m_PlotFieldProgram = plotFieldProgram;
 
+    // Delete shaders as they are no longer necessary
     delete vertexShader;
     delete plotFieldShader;
-    delete plotPhaseShader;
 
-    // Vertex array
-    float vertices[] = {
-        // Top left -  screen coordinates
-        -1.0f, +1.0f,
-        // Top left - UV
-        0.0f, 0.0f,
-
-        // Top right -  screen coordinates
-        +1.0f, +1.0f,
-        // Top right - UV
-        1.0f, 0.0f,
-
-        // Bottom left -  screen coordinates
-        -1.0f, -1.0f,
-        // Bottom left - UV
-        0.0f, 1.0f,
-
-        // Bottom right -  screen coordinates
-        1.0f, -1.0f,
-        // Bottom right - UV
-        1.0f, 1.0f};
-
-    float verticesRIGHTSIDEUP[] = {
-        // Top left -  screen coordinates
-        -1.0f, +1.0f,
-        // Top left - UV
-        0.0f, 1.0f,
-
-        // Top right -  screen coordinates
-        +1.0f, +1.0f,
-        // Top right - UV
-        1.0f, 1.0f,
-
-        // Bottom left -  screen coordinates
-        -1.0f, -1.0f,
-        // Bottom left - UV
-        0.0f, 0.0f,
-
-        // Bottom right -  screen coordinates
-        1.0f, -1.0f,
-        // Bottom right - UV
-        1.0f, 0.0f};
-
-    uint32_t indices[] = {
-        1, 3, 0, // first triangle
-        3, 2, 0  // second triangle
-    };
-
+    // Define vertex buffer layout
     VertexBufferLayout layout = {{BufferElementType::FLOAT2, false}, {BufferElementType::FLOAT2, true}};
-
+    // Create vertex and index buffer for a fullscreen textured quad
     VertexBuffer *vertexBuffer = new VertexBuffer((void *)vertices, sizeof(vertices), BufferUsageType::STATIC_DRAW, layout);
-    IndexBuffer *indexBuffer = new IndexBuffer(indices, 6, BufferUsageType::STATIC_DRAW);
-
+    IndexBuffer *indexBuffer = new IndexBuffer(indices, sizeof(indices), BufferUsageType::STATIC_DRAW);
+    // Save vertex buffer and index buffer into a vertex array
     VertexArray *vertexArray = new VertexArray();
     vertexArray->bindVertexBuffer(vertexBuffer);
     vertexArray->bindIndexBuffer(indexBuffer);
-
-    this->m_mainViewportVertexArray = vertexArray;
+    // Save vertex array
+    this->m_MainViewportVertexArray = vertexArray;
 
     // Create framebuffer
     Framebuffer *framebuffer = new Framebuffer(1920, 1080);
-    this->m_framebuffer = framebuffer;
+    this->m_Framebuffer = framebuffer;
 
-    this->m_simulation = Simulation::createDomainWallSimulation();
+    // Create topological defect simulation. Default is domain walls.
+    this->m_Simulation = Simulation::createDomainWallSimulation();
+    // Set default field.
+    m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/domain_walls_M200_N200_np20228.ctdd"));
+    // Set default colormap
+    m_colorMap = Texture2D::loadFromPNG("colormaps/twilight_shifted_colormap.png");
 
-    m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
-
-    m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
+    // Initialise file dialog system
+    NFD_Init();
 
     // Initialisation complete
     this->isInitialised = true;
     logDebug("Application initialisation completed successfully!");
-
-    // Initialise file dialog system
-    NFD_Init();
 
     return;
 }
@@ -212,10 +200,9 @@ Application::~Application()
     ImGui::DestroyContext();
 
     // De-allocate
-    delete m_plotFieldProgram;
-    delete m_plotPhaseProgram;
-    delete m_mainViewportVertexArray;
-    delete m_simulation;
+    delete m_PlotFieldProgram;
+    delete m_MainViewportVertexArray;
+    delete m_Simulation;
 
     // Terminate
     glfwTerminate();
@@ -229,10 +216,10 @@ Application::~Application()
 void Application::run()
 {
     // Application loop
-    while (!glfwWindowShouldClose(m_windowHandle))
+    while (!glfwWindowShouldClose(m_WindowHandle))
     {
         // Handle input
-        processInput(m_windowHandle);
+        processInput(m_WindowHandle);
         // 1. Frame rate limited update
         double now = glfwGetTime();
         double updateDelta = now - m_lastUpdateTime;
@@ -248,7 +235,7 @@ void Application::run()
             Application::onImGuiRender();
             Application::endImGuiFrame();
             // Swap image buffer
-            glfwSwapBuffers(m_windowHandle);
+            glfwSwapBuffers(m_WindowHandle);
 
             // Update time of last frame
             m_lastFrameTime = now;
@@ -276,36 +263,36 @@ void Application::run()
 void Application::onRender()
 {
     // Bind framebuffer
-    glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer->framebufferID);
-    glViewport(0, 0, m_framebuffer->width, m_framebuffer->height);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_Framebuffer->framebufferID);
+    glViewport(0, 0, m_Framebuffer->width, m_Framebuffer->height);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    if (m_currentPlottingProcedureIndex == 0 || m_simulation->fields.size() < 2)
+    if (m_currentPlottingProcedureIndex == 0 || m_Simulation->fields.size() < 2)
     {
-        m_plotFieldProgram->use();
-        glUniform1f(0, 1.0f);
+        m_PlotFieldProgram->use();
+        glUniform1f(0, m_Simulation->getMaxValue());
         m_colorMap->bind(0);
-        if (m_showLaplacian)
-        {
-            m_simulation->getCurrentLaplacian()->bind(1);
-        }
-        else
-        {
-            m_simulation->getCurrentRenderTexture()->bind(1);
-        }
+        m_Simulation->getCurrentRenderTexture()->bind(1);
     }
     else if (m_currentPlottingProcedureIndex == 1)
     {
-        m_plotPhaseProgram->use();
+        m_PlotFieldProgram->use();
+        glUniform1f(0, M_PI);
         m_colorMap->bind(0);
-        m_simulation->getRenderTexture(0)->bind(1);
-        m_simulation->getRenderTexture(1)->bind(2);
+        m_Simulation->getCurrentPhase()->bind(1);
+    }
+    else if (m_currentPlottingProcedureIndex == 2)
+    {
+        m_PlotFieldProgram->use();
+        glUniform1f(0, m_Simulation->getMaxValue());
+        m_colorMap->bind(0);
+        m_Simulation->getCurrentLaplacian()->bind(1);
     }
 
     // Bind VAO
-    m_mainViewportVertexArray->bind();
+    m_MainViewportVertexArray->bind();
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -377,7 +364,7 @@ void Application::onImGuiRender()
 {
     if (ImGui::Begin("Left Hand Window"))
     {
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_imguiIO->Framerate, m_imguiIO->Framerate);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / m_ImGuiIO->Framerate, m_ImGuiIO->Framerate);
 
         // Show update speed
         ImGui::Text("Simulation average %.3f ms/tick (%.1f TPS)", 1000.0f / m_tickRate, m_tickRate);
@@ -386,9 +373,9 @@ void Application::onImGuiRender()
         ImGui::SliderFloat("Simulation FPS", &m_simulationFPS, 1.0f, 1000.0f);
 
         // Current simulation time
-        ImGui::Text("Simulation time %f", m_simulation->getCurrentSimulationTime());
+        ImGui::Text("Simulation time %f", m_Simulation->getCurrentSimulationTime());
         // Current simulation timestep
-        ImGui::Text("Simulation timestep %d", m_simulation->getCurrentSimulationTimestep());
+        ImGui::Text("Simulation timestep %d", m_Simulation->getCurrentSimulationTimestep());
 
         // Control the number of timesteps
         ImGui::InputInt("Max Timesteps", &m_maxTimesteps, 100, 1000);
@@ -406,9 +393,9 @@ void Application::onImGuiRender()
             {
                 std::vector<std::shared_ptr<Texture2D>> loadedTextures = Texture2D::loadFromCTDDFile(outPath);
                 logTrace("The new ctdd contains %d fields", loadedTextures.size());
-                m_simulation->setField(loadedTextures);
-                m_simulation->originalFields = loadedTextures;
-                m_simulation->originalFields.resize(loadedTextures.size());
+                m_Simulation->setField(loadedTextures);
+                m_Simulation->originalFields = loadedTextures;
+                m_Simulation->originalFields.resize(loadedTextures.size());
 
                 // Free file path after use
                 NFD_FreePath(outPath);
@@ -430,7 +417,7 @@ void Application::onImGuiRender()
             nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, nullptr);
             if (result == NFD_OKAY)
             {
-                m_simulation->saveFields(outPath);
+                m_Simulation->saveFields(outPath);
                 logDebug("Saving field at path %s", outPath);
 
                 // Free file path after use
@@ -450,11 +437,11 @@ void Application::onImGuiRender()
         if (ImGui::Button("Change colormap"))
         {
             nfdchar_t *outPath;
-            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdfilteritem_t filterItem[1] = {{"Portable Network Graphics", "png"}};
             nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, NULL);
             if (result == NFD_OKAY)
             {
-                m_colorMap = Texture2D::loadFromCTDDFile(outPath)[0];
+                m_colorMap = Texture2D::loadFromPNG(outPath);
 
                 // Free file path after use
                 NFD_FreePath(outPath);
@@ -469,7 +456,7 @@ void Application::onImGuiRender()
             }
         }
 
-        const char *availablePlottingProcedures[] = {"Field", "Phase"};
+        const char *availablePlottingProcedures[] = {"Field", "Phase", "Laplacian"};
 
         if (ImGui::BeginCombo("Plotting", m_currentPlottingProcedure))
         {
@@ -501,30 +488,30 @@ void Application::onImGuiRender()
                     m_currentSimulationProcedure = availableSimulationProcedures[n];
 
                     // Set new simulation
-                    delete m_simulation;
+                    delete m_Simulation;
                     if (n == 0)
                     {
-                        m_simulation = Simulation::createDomainWallSimulation();
+                        m_Simulation = Simulation::createDomainWallSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
+                        m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/domain_walls_M200_N200_np20228.ctdd"));
                     }
                     else if (n == 1)
                     {
-                        m_simulation = Simulation::createCosmicStringSimulation();
+                        m_Simulation = Simulation::createCosmicStringSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np16579.ctdd"));
+                        m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/cosmic_strings_M200_N200_np20228.ctdd"));
                     }
                     else if (n == 2)
                     {
-                        m_simulation = Simulation::createSingleAxionSimulation();
+                        m_Simulation = Simulation::createSingleAxionSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
+                        m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/single_axion_M300_N300_np20228.ctdd"));
                     }
                     else if (n == 3)
                     {
-                        m_simulation = Simulation::createCompanionAxionSimulation();
+                        m_Simulation = Simulation::createCompanionAxionSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
+                        m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/companion_axion_M300_N300_np20228.ctdd"));
                     }
                 }
                 if (isSelected)
@@ -536,8 +523,7 @@ void Application::onImGuiRender()
         }
 
         ImGui::Text("Simulation Controls and Parameters");
-        ImGui::Checkbox("Show Laplacian", &m_showLaplacian);
-        m_simulation->onUIRender();
+        m_Simulation->onUIRender();
     }
     ImGui::End();
 
@@ -546,7 +532,7 @@ void Application::onImGuiRender()
         constexpr uint32_t imageWidth = 1176;
         constexpr uint32_t imageHeight = 1003;
         constexpr ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
-        ImGui::Image((void *)(intptr_t)m_framebuffer->renderTextureID, imageSize);
+        ImGui::Image((void *)(intptr_t)m_Framebuffer->renderTextureID, imageSize);
     }
     ImGui::End();
 }
@@ -559,21 +545,16 @@ void Application::endImGuiFrame()
 
 void Application::onUpdate()
 {
-    // m_simulation->update();
+    // m_Simulation->update();
 }
 void Application::onSimulationUpdate()
 {
-    if (m_simulation->getCurrentSimulationTimestep() >= m_maxTimesteps)
+    if (m_Simulation->getCurrentSimulationTimestep() >= m_maxTimesteps)
     {
-        m_simulation->runFlag = false;
+        m_Simulation->runFlag = false;
     }
 
-    m_simulation->update();
-}
-
-void framebufferSizeCallback(GLFWwindow *window, int width, int height)
-{
-    glViewport(0, 0, width, height);
+    m_Simulation->update();
 }
 
 void processInput(GLFWwindow *window)

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <texture.h>
 #include <log.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 Texture2D::Texture2D()
 {
@@ -94,6 +96,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
     uint32_t numFields;
     uint32_t M;
     uint32_t N;
+    float simulationTime;
 
     std::ifstream dataFile;
     dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -114,7 +117,8 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         {
             dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
             dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
-            logTrace("Field %d - M = %d, N = %d", fieldIndex, M, N);
+            dataFile.read(reinterpret_cast<char *>(&simulationTime), sizeof(float));
+            logTrace("Field %d - M = %d, N = %d, currentTime = %f", fieldIndex, M, N, simulationTime);
             std::vector<float> textureData(M * N * 4);
             for (int rowIndex = 0; rowIndex < M; rowIndex++)
             {
@@ -127,18 +131,15 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
                     dataFile.read(reinterpret_cast<char *>(&fieldValue), sizeof(float));
                     dataFile.read(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
-                    dataFile.read(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
 
                     // Red channel - field value
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0] = fieldValue;
                     // Green channel - field velocity
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1] = fieldVelocity;
-                    // Blue channel - field accleration
-                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = fieldAcceleration;
-                    // TODO: Having the alpha channel store time is pretty hacky and should be removed. It should just be a
-                    // uniform. A uniform can't be written to so a buffer?
-                    // Alpha channel - current time
-                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 3] = 0.1f;
+                    // Blue channel - current field acceleration
+                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = 0.0f;
+                    // Alpha channel - next field acceleration
+                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 3] = 0.0f;
                 }
             }
             fields[fieldIndex] = std::shared_ptr<Texture2D>(new Texture2D());
@@ -187,4 +188,17 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::createTextures(uint32_t width
     }
 
     return fields;
+}
+
+Texture2D *Texture2D::loadFromPNG(const char *filePath)
+{
+    int width, height, bpp;
+    unsigned char *data = stbi_load(filePath, &width, &height, &bpp, STBI_rgb);
+    // Create new texture
+    Texture2D *pngTexture = new Texture2D();
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+
+    stbi_image_free(data);
+    return pngTexture;
 }

@@ -76,12 +76,28 @@ public:
     std::vector<std::shared_ptr<Texture2D>> originalFields;
     std::vector<Texture2D> fields;
 
-    Simulation(uint32_t numFields, ComputeShaderProgram *firstPass, ComputeShaderProgram *laplacianPass, ComputeShaderProgram *secondPass, SimulationLayout layout)
-        : firstPass(firstPass), laplacianPass(laplacianPass), secondPass(secondPass), layout(layout)
+    Simulation(
+        uint32_t numFields,
+        ComputeShaderProgram *evolveFieldPass,
+        ComputeShaderProgram *evolveVelocityPass,
+        ComputeShaderProgram *calculateAccelerationPass,
+        ComputeShaderProgram *updateAccelerationPass,
+        ComputeShaderProgram *calculateLaplacianPass,
+        ComputeShaderProgram *calculatePhasePass,
+        SimulationLayout layout)
+        : m_NumFields(numFields),
+          m_EvolveFieldPass(evolveFieldPass),
+          m_EvolveVelocityPass(evolveVelocityPass),
+          m_CalculateAccelerationPass(calculateAccelerationPass),
+          m_UpdateAccelerationPass(updateAccelerationPass),
+          m_CalculateLaplacianPass(calculateLaplacianPass),
+          m_CalculatePhasePass(calculateLaplacianPass),
+          layout(layout)
     {
         // Resize vectors to the correct number of fields
-        fields.resize(numFields);
-        laplacians.resize(numFields);
+        fields.resize(m_NumFields);
+        m_LaplacianTextures.resize(m_NumFields);
+        m_PhaseTextures.resize(floor(m_NumFields / 2));
 
         // Create uniform values
         for (const auto &element : layout.elements)
@@ -152,6 +168,9 @@ public:
     Texture2D *getRenderTexture(uint32_t fieldIndex);
     Texture2D *getCurrentRenderTexture();
     Texture2D *getCurrentLaplacian();
+    Texture2D *getCurrentPhase();
+
+    float getMaxValue();
 
     float getCurrentSimulationTime();
     int getCurrentSimulationTimestep();
@@ -163,19 +182,31 @@ public:
 
 private:
     // Field data
-    std::vector<Texture2D> laplacians;
+    std::vector<Texture2D> m_LaplacianTextures;
+    std::vector<Texture2D> m_PhaseTextures;
 
-    ComputeShaderProgram *firstPass;
-    ComputeShaderProgram *laplacianPass;
-    ComputeShaderProgram *phasePass;
-    ComputeShaderProgram *secondPass;
+    // Calculate and update field
+    ComputeShaderProgram *m_EvolveFieldPass;
+    // Calculate and update the velocity
+    ComputeShaderProgram *m_EvolveVelocityPass;
+
+    // Calculate acceleration
+    ComputeShaderProgram *m_CalculateAccelerationPass;
+    // Update acceleration
+    ComputeShaderProgram *m_UpdateAccelerationPass;
+    // Calculate Laplacian into new texture
+    ComputeShaderProgram *m_CalculateLaplacianPass;
+
+    // Calculate the phase if there are multiple fields
+    ComputeShaderProgram *m_CalculatePhasePass;
+
     // Universal parameters
     float dx = 1.0f;
     float dt = 0.1f;
     int era = 1;
 
     // Keep track of time
-    int timestep = 0;
+    int timestep = 1;
 
     // Extra simulation parameters that are non-specific
     SimulationLayout layout;
@@ -186,4 +217,6 @@ private:
 
     // Render field index
     int32_t renderIndex = 0;
+
+    uint32_t m_NumFields = 0;
 };

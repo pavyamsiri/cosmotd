@@ -256,7 +256,7 @@ class IndexBuffer
 public:
     uint32_t bufferID;
 
-    IndexBuffer(uint32_t *indices, uint32_t count, BufferUsageType usageType);
+    IndexBuffer(const uint32_t *indices, uint32_t count, BufferUsageType usageType);
     ~IndexBuffer();
 
     void bind() const;

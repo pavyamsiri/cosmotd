@@ -52,6 +52,7 @@ target_include_directories(cosmotd PRIVATE
     external/glad/include
     external/glfw/include
     external/imgui
+    external/stbi
 ) # Not entirely sure what PRIVATE means
 
 # Specify the libraries for the linker to the target

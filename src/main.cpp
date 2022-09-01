@@ -10,11 +10,12 @@
 
 // Internal libraries
 #include "application.h"
+#include "errors.h"
 #include "log.h"
 #include "shader.h"
 #include "shader_program.h"
 
-// Constants
+// Application specification
 constexpr uint32_t SCREEN_WIDTH = 800;
 constexpr uint32_t SCREEN_HEIGHT = 600;
 constexpr const char *APPLICATION_TITLE = "Cosmological Topological Defects";
@@ -25,12 +26,12 @@ int main()
     if (!app->isInitialised)
     {
         logFatal("Failed to initialise application!");
-        return -1;
+        return APPLICATION_INITIALISATION_FAILURE;
     }
 
     app->run();
 
     delete app;
 
-    return 0;
+    return APPLICATION_SUCCESS;
 }

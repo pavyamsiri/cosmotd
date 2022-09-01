@@ -40,9 +40,15 @@ const char *convertUniformDataTypeToString(UniformDataType type)
 
 Simulation::~Simulation()
 {
-    delete firstPass;
-    delete laplacianPass;
-    delete secondPass;
+    delete m_EvolveFieldPass;
+    delete m_EvolveVelocityPass;
+    delete m_CalculateAccelerationPass;
+    delete m_UpdateAccelerationPass;
+    delete m_CalculateLaplacianPass;
+    if (!m_CalculatePhasePass)
+    {
+        delete m_CalculatePhasePass;
+    }
 }
 
 void Simulation::update()
@@ -52,212 +58,123 @@ void Simulation::update()
         return;
     }
 
-    timestep += 1;
-
-#if 1
-    // const int xNumGroups = ceil(fields[0].width / 8);
-    // const int yNumGroups = ceil(fields[0].height / 4);
     static const int xNumGroups = ceil(fields[0].width / 4);
     static const int yNumGroups = ceil(fields[0].height / 4);
 
     // Evolve field and time for all fields first
-    uint32_t fieldIndex = 0;
-    for (const auto &currentField : fields)
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
-        firstPass->use();
+        // Calculate and update field
+        m_EvolveFieldPass->use();
         glUniform1f(0, dt);
         // Bind read image
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-
+        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
         glDispatchCompute(xNumGroups, yNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        laplacianPass->use();
+        // Update time
+        timestep += 1;
+
+        // Calculate Laplacian
+        m_CalculateLaplacianPass->use();
         glUniform1f(0, dx);
         // Bind images
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, currentField.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         glActiveTexture(GL_TEXTURE1);
-        glBindImageTexture(1, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
         // Dispatch and barrier
         glDispatchCompute(xNumGroups, yNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-        fieldIndex++;
     }
 
-    // This is the new implementation where we run one shader to evolve all field's acceleration and velocity.
-    secondPass->use();
-    glUniform1f(0, dt);
-    glUniform1i(1, era);
-    // Bind the rest of the uniforms
+    // Calculate phase if there is more than one field
+    if (fields.size() > 1)
+    {
+        // Bind two textures at once and calculate the phase
+        for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex += 2)
+        {
+            m_CalculatePhasePass->use();
+            // Real part
+            glActiveTexture(GL_TEXTURE0);
+            glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            // Imaginary part
+            glActiveTexture(GL_TEXTURE1);
+            glBindImageTexture(1, fields[fieldIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            // Output phase texture
+            glActiveTexture(GL_TEXTURE2);
+            glBindImageTexture(2, m_PhaseTextures[floor(fieldIndex / 2)].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+            // Dispatch and barrier
+            glDispatchCompute(xNumGroups, yNumGroups, 1);
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        }
+    }
+
+    // Calculate the acceleration
+    m_CalculateAccelerationPass->use();
+    glUniform1f(0, timestep * dt);
+    glUniform1f(1, dt);
+    glUniform1i(2, era);
     bindUniforms();
     uint32_t bindIndex = 0;
-    fieldIndex = 0;
     uint32_t activeTextureIndex = GL_TEXTURE0;
-    for (const auto &currentField : fields)
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
         // Bind field
         glActiveTexture(activeTextureIndex++);
-        glBindImageTexture(bindIndex, currentField.textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        bindIndex++;
-        // Bind its laplacian
+        glBindImageTexture(bindIndex++, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Bind its Laplacian
         glActiveTexture(activeTextureIndex++);
-        glBindImageTexture(bindIndex, laplacians[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-        bindIndex++;
+        glBindImageTexture(bindIndex++, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+    }
 
-        fieldIndex++;
+    // Bind phases if they exist
+    if (m_PhaseTextures.size() > 0)
+    {
+        for (const auto &phaseTexture : m_PhaseTextures)
+        {
+            // Bind its phase
+            glActiveTexture(activeTextureIndex++);
+            glBindImageTexture(bindIndex++, phaseTexture.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+        }
     }
 
     // Dispatch and barrier
     glDispatchCompute(xNumGroups, yNumGroups, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-#else
-
-    // Manually compute the fields
-
-    int M, N;
-    int miplevel = 0;
-    // Load real and imaginary field data
-    glBindTexture(GL_TEXTURE_2D, fields[0].textureID);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
-
-    std::vector<float> realFieldData(M * N * 4);
-
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(realFieldData.data()));
-
-    glBindTexture(GL_TEXTURE_2D, fields[1].textureID);
-
-    std::vector<float> imagFieldData(M * N * 4);
-
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(imagFieldData.data()));
-
-    // Evolve the field values
-    for (int i = 0; i < M; i++)
+    // Update velocity and acceleration
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex += 2)
     {
-        for (int j = 0; j < N; j++)
-        {
-            // Real
-            float currentRealValue = realFieldData[(i * 4 * N) + 4 * j + 0];
-            float currentRealVelocity = realFieldData[(i * 4 * N) + 4 * j + 1];
-            float currentRealAcceleration = realFieldData[(i * 4 * N) + 4 * j + 2];
-            float currentTime = realFieldData[(i * 4 * N) + 4 * j + 3];
+        // Calculate and update the velocity
+        m_EvolveVelocityPass->use();
+        glUniform1f(0, dt);
+        // Bind field
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Dispatch and barrier
+        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-            float nextRealValue = currentRealValue + 0.1f * (currentRealVelocity + 0.5f * currentRealAcceleration * 0.1f);
-            float nextTime = currentTime + 0.1f;
-
-            realFieldData[(i * 4 * N) + 4 * j + 0] = nextRealValue;
-            realFieldData[(i * 4 * N) + 4 * j + 3] = nextTime;
-
-            // Imaginary
-            float currentImagValue = imagFieldData[(i * 4 * N) + 4 * j + 0];
-            float currentImagVelocity = imagFieldData[(i * 4 * N) + 4 * j + 1];
-            float currentImagAcceleration = imagFieldData[(i * 4 * N) + 4 * j + 2];
-
-            float nextImagValue = currentImagValue + 0.1f * (currentImagVelocity + 0.5f * currentImagAcceleration * 0.1f);
-
-            imagFieldData[(i * 4 * N) + 4 * j + 0] = nextImagValue;
-            imagFieldData[(i * 4 * N) + 4 * j + 3] = nextTime;
-        }
+        // Now acceleration can be updated
+        m_UpdateAccelerationPass->use();
+        glUniform1f(0, dt);
+        // Bind field
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Dispatch and barrier
+        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
-
-    // Evolve the velocity and acceleration
-    for (int i = 0; i < M; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            // Indices
-            size_t centralIndex = (i * 4 * N) + 4 * j;
-            size_t downOneIndex = (modulo(i + 1, M) * 4 * N) + 4 * j;
-            size_t upOneIndex = (modulo(i - 1, M) * 4 * N) + 4 * j;
-            size_t downTwoIndex = (modulo(i + 2, M) * 4 * N) + 4 * j;
-            size_t upTwoIndex = (modulo(i - 2, M) * 4 * N) + 4 * j;
-            size_t rightOneIndex = (i * 4 * N) + 4 * modulo(j + 1, N);
-            size_t leftOneIndex = (i * 4 * N) + 4 * modulo(j - 1, N);
-            size_t rightTwoIndex = (i * 4 * N) + 4 * modulo(j + 2, N);
-            size_t leftTwoIndex = (i * 4 * N) + 4 * modulo(j - 2, N);
-
-            // Real laplacian
-            float centralRealValue = realFieldData[centralIndex + 0];
-            float downOneRealValue = realFieldData[downOneIndex + 0];
-            float upOneRealValue = realFieldData[upOneIndex + 0];
-            float downTwoRealValue = realFieldData[downTwoIndex + 0];
-            float upTwoRealValue = realFieldData[upTwoIndex + 0];
-            float rightOneRealValue = realFieldData[rightOneIndex + 0];
-            float leftOneRealValue = realFieldData[leftOneIndex + 0];
-            float rightTwoRealValue = realFieldData[rightTwoIndex + 0];
-            float leftTwoRealValue = realFieldData[leftTwoIndex + 0];
-
-            float realLaplacian = -60.0f * centralRealValue + 16.0f * (downOneRealValue + upOneRealValue + leftOneRealValue + rightOneRealValue) - (leftTwoRealValue + rightTwoRealValue + downTwoRealValue + upTwoRealValue);
-            realLaplacian /= 12.0f;
-
-            // Imaginary laplacian
-            float centralImagValue = imagFieldData[centralIndex + 0];
-            float downOneImagValue = imagFieldData[downOneIndex + 0];
-            float upOneImagValue = imagFieldData[upOneIndex + 0];
-            float downTwoImagValue = imagFieldData[downTwoIndex + 0];
-            float upTwoImagValue = imagFieldData[upTwoIndex + 0];
-            float rightOneImagValue = imagFieldData[rightOneIndex + 0];
-            float leftOneImagValue = imagFieldData[leftOneIndex + 0];
-            float rightTwoImagValue = imagFieldData[rightTwoIndex + 0];
-            float leftTwoImagValue = imagFieldData[leftTwoIndex + 0];
-
-            float imagLaplacian = -60.0f * centralImagValue + 16.0f * (downOneImagValue + upOneImagValue + leftOneImagValue + rightOneImagValue) - (leftTwoImagValue + rightTwoImagValue + downTwoImagValue + upTwoImagValue);
-            imagLaplacian /= 12.0f;
-
-            float squareAmplitude = pow(centralRealValue, 2) + pow(centralImagValue, 2);
-            float nextTime = realFieldData[centralIndex + 3];
-            static float colorAnomaly = 3.0f;
-            static float axionStrength = 0.005f * 5.0f;
-            static float growthScale = 75.0f;
-            static float growthLaw = 2.0f;
-            float axionFactor = 2 * colorAnomaly * axionStrength;
-            axionFactor *= pow(nextTime / growthScale, growthLaw);
-            axionFactor *= sin(colorAnomaly * atan2(centralImagValue, centralRealValue));
-            axionFactor /= squareAmplitude;
-
-            float currentRealAcceleration = realFieldData[centralIndex + 2];
-            float currentRealVelocity = realFieldData[centralIndex + 1];
-
-            float currentImagVelocity = imagFieldData[centralIndex + 1];
-            float currentImagAcceleration = imagFieldData[centralIndex + 2];
-
-            // Evolve acceleration
-            // float nextRealAcceleration = realLaplacian - 2.0f * (1.0f / nextTime) * currentRealVelocity - 5.0f * (squareAmplitude - 1.0f) * centralRealValue;
-            // float nextImagAcceleration = imagLaplacian - 2.0f * (1.0f / nextTime) * currentImagVelocity - 5.0f * (squareAmplitude - 1.0f) * centralImagValue;
-            float nextRealAcceleration = realLaplacian - 2.0f * (1.0f / nextTime) * currentRealVelocity - 5.0f * (pow(centralRealValue, 2) - 1.0f) * centralRealValue - centralImagValue * axionFactor;
-            float nextImagAcceleration = imagLaplacian - 2.0f * (1.0f / nextTime) * currentImagVelocity - 5.0f * (pow(centralImagValue, 2) - 1.0f) * centralImagValue + centralRealValue * axionFactor;
-
-            // Evolve velocity
-            float nextRealVelocity = currentRealVelocity + 0.5f * (currentRealAcceleration + nextRealAcceleration) * 0.1f;
-            float nextImagVelocity = currentImagVelocity + 0.5f * (currentImagAcceleration + nextImagAcceleration) * 0.1f;
-
-            // Set new values
-            realFieldData[centralIndex + 1] = nextRealVelocity;
-            realFieldData[centralIndex + 2] = nextRealAcceleration;
-
-            imagFieldData[centralIndex + 1] = nextImagVelocity;
-            imagFieldData[centralIndex + 2] = nextImagAcceleration;
-        }
-    }
-
-    glBindTexture(GL_TEXTURE_2D, fields[0].textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, N, M, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(realFieldData.data()));
-    glBindTexture(GL_TEXTURE_2D, fields[1].textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, N, M, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(imagFieldData.data()));
-
-#endif
 }
 
 void Simulation::bindUniforms()
 {
     // NOTE: This is hardcoded to be 4 because currently the first four uniform locations are taken by the universal parameters.
     // They might be packed together as one float4 though and so this value might need to change to 1.
-    uint32_t currentLocation = 2;
+    uint32_t currentLocation = 3;
 
     // Reset uniform indices
     uint32_t floatUniformIndex = 0;
@@ -473,45 +390,67 @@ void Simulation::onUIRender()
     }
 }
 
-void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> startFields)
+void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
 {
+    // Check that the number of fields are the same or at least more
+    if (m_NumFields > newFields.size())
+    {
+        logError("The number of fields to be set is lower than the simulations required amount. Aborting operation.");
+        return;
+    }
+
     // Reset timestep
     timestep = 0;
 
-    // Resize vector to be the same
-    fields.resize(startFields.size());
-    laplacians.resize(startFields.size());
     // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
     // reset to the original field.
-    originalFields = std::vector<std::shared_ptr<Texture2D>>(startFields);
+    originalFields = std::vector<std::shared_ptr<Texture2D>>(newFields);
 
     // Copy texture data over
-    uint32_t fieldIndex = 0;
-    for (const auto &currentField : startFields)
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
         // Set width and height for textures
-        uint32_t height = currentField->height;
-        uint32_t width = currentField->width;
+        uint32_t height = newFields[fieldIndex]->height;
+        uint32_t width = newFields[fieldIndex]->width;
         fields[fieldIndex].width = width;
         fields[fieldIndex].height = height;
 
         // Allocate data for textures
         glBindTexture(GL_TEXTURE_2D, fields[fieldIndex].textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
         glCopyImageSubData(
-            currentField->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+            newFields[fieldIndex]->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             fields[fieldIndex].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             width, height, 1);
 
-        if (laplacians[fieldIndex].width != width || laplacians[fieldIndex].height != height)
+        // Resize Laplacian texture sizes if necessary
+        if (m_LaplacianTextures[fieldIndex].width != width || m_LaplacianTextures[fieldIndex].height != height)
         {
             // Create new texture because old texture is of the wrong size
-            laplacians[fieldIndex] = Texture2D();
+            m_LaplacianTextures[fieldIndex] = Texture2D();
 
-            glBindTexture(GL_TEXTURE_2D, laplacians[fieldIndex].textureID);
-            glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, width, height);
-            laplacians[fieldIndex].width = width;
-            laplacians[fieldIndex].height = height;
+            glBindTexture(GL_TEXTURE_2D, m_LaplacianTextures[fieldIndex].textureID);
+            glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, width, height);
+            m_LaplacianTextures[fieldIndex].width = width;
+            m_LaplacianTextures[fieldIndex].height = height;
+        }
+
+        // Resize phase texture sizes if necessary
+        // TODO: This might happen twice more than necessary, however if the resizing is successful on the first go then
+        // it probably is fine, as the second go would be properly sized.
+        if (m_PhaseTextures.size() > 0)
+        {
+            size_t phaseIndex = floor(fieldIndex / 2);
+            if (m_PhaseTextures[phaseIndex].width != width || m_PhaseTextures[phaseIndex].height != height)
+            {
+                // Create new texture because old texture is of the wrong size
+                m_PhaseTextures[phaseIndex] = Texture2D();
+
+                glBindTexture(GL_TEXTURE_2D, m_PhaseTextures[phaseIndex].textureID);
+                glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, width, height);
+                m_PhaseTextures[phaseIndex].width = width;
+                m_PhaseTextures[phaseIndex].height = height;
+            }
         }
 
         fieldIndex++;
@@ -581,7 +520,17 @@ Texture2D *Simulation::getCurrentRenderTexture()
 
 Texture2D *Simulation::getCurrentLaplacian()
 {
-    return &laplacians[renderIndex];
+    return &m_LaplacianTextures[renderIndex];
+}
+
+Texture2D *Simulation::getCurrentPhase()
+{
+    return &m_PhaseTextures[floor(renderIndex / 2)];
+}
+
+float Simulation::getMaxValue()
+{
+    return 1.0f;
 }
 
 float Simulation::getCurrentSimulationTime()
@@ -597,96 +546,172 @@ int Simulation::getCurrentSimulationTimestep()
 Simulation *Simulation::createDomainWallSimulation()
 {
     // Set up compute shader
-    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
-    if (!firstComputeProgram->isInitialised)
+    Shader *evolveFieldShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveFieldPass = new ComputeShaderProgram(evolveFieldShader);
+    if (!evolveFieldPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
-    if (!laplacianComputeProgram->isInitialised)
+    Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
+    if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *secondComputeShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
-    if (!secondComputeProgram->isInitialised)
+    Shader *calculateAccelerationShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
+    if (!calculateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
+    if (!updateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
+    if (!calculateLaplacianPass->isInitialised)
     {
         return nullptr;
     }
 
-    delete firstComputeShader;
-    delete laplacianComputeShader;
-    delete secondComputeShader;
+    delete evolveFieldShader;
+    delete evolveVelocityShader;
+    delete calculateAccelerationShader;
+    delete updateAccelerationShader;
+    delete calculateLaplacianShader;
 
     // Domain wall
     SimulationLayout simulationLayout = {
         {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
 
-    return new Simulation(1, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+    uint32_t numFields = 1;
+
+    return new Simulation(
+        numFields,
+        evolveFieldPass,
+        evolveVelocityPass,
+        calculateAccelerationPass,
+        updateAccelerationPass,
+        calculateLaplacianPass,
+        nullptr,
+        simulationLayout);
 }
 
 Simulation *Simulation::createCosmicStringSimulation()
 {
     // Set up compute shader
-    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
-    if (!firstComputeProgram->isInitialised)
+    Shader *evolveFieldShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveFieldPass = new ComputeShaderProgram(evolveFieldShader);
+    if (!evolveFieldPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
-    if (!laplacianComputeProgram->isInitialised)
+    Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
+    if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *secondComputeShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
-    if (!secondComputeProgram->isInitialised)
+    Shader *calculateAccelerationShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
+    if (!calculateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
+    if (!updateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
+    if (!calculateLaplacianPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
+    if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
 
-    delete firstComputeShader;
-    delete laplacianComputeShader;
-    delete secondComputeShader;
+    delete evolveFieldShader;
+    delete evolveVelocityShader;
+    delete calculateAccelerationShader;
+    delete updateAccelerationShader;
+    delete calculateLaplacianShader;
+    delete calculatePhaseShader;
 
     // Cosmic string
     SimulationLayout simulationLayout = {
         {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f}};
 
-    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+    uint32_t numFields = 2;
+
+    return new Simulation(
+        numFields,
+        evolveFieldPass,
+        evolveVelocityPass,
+        calculateAccelerationPass,
+        updateAccelerationPass,
+        calculateLaplacianPass,
+        calculatePhasePass,
+        simulationLayout);
 }
 
 Simulation *Simulation::createSingleAxionSimulation()
 {
     // Set up compute shader
-    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
-    if (!firstComputeProgram->isInitialised)
+    Shader *evolveFieldShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveFieldPass = new ComputeShaderProgram(evolveFieldShader);
+    if (!evolveFieldPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
-    if (!laplacianComputeProgram->isInitialised)
+    Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
+    if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *secondComputeShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
-    if (!secondComputeProgram->isInitialised)
+    Shader *calculateAccelerationShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
+    if (!calculateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
+    if (!updateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
+    if (!calculateLaplacianPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
+    if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
 
-    delete firstComputeShader;
-    delete laplacianComputeShader;
-    delete secondComputeShader;
+    delete evolveFieldShader;
+    delete evolveVelocityShader;
+    delete calculateAccelerationShader;
+    delete updateAccelerationShader;
+    delete calculateLaplacianShader;
+    delete calculatePhaseShader;
 
     // Single axion
     SimulationLayout simulationLayout = {
@@ -698,48 +723,91 @@ Simulation *Simulation::createSingleAxionSimulation()
         {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
     };
 
-    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+    uint32_t numFields = 2;
+
+    return new Simulation(
+        numFields,
+        evolveFieldPass,
+        evolveVelocityPass,
+        calculateAccelerationPass,
+        updateAccelerationPass,
+        calculateLaplacianPass,
+        calculatePhasePass,
+        simulationLayout);
 }
 
 Simulation *Simulation::createCompanionAxionSimulation()
 {
     // Set up compute shader
-    Shader *firstComputeShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *firstComputeProgram = new ComputeShaderProgram(firstComputeShader);
-    if (!firstComputeProgram->isInitialised)
+    Shader *evolveFieldShader = new Shader("shaders/evolve_field.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveFieldPass = new ComputeShaderProgram(evolveFieldShader);
+    if (!evolveFieldPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *laplacianComputeShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *laplacianComputeProgram = new ComputeShaderProgram(laplacianComputeShader);
-    if (!laplacianComputeProgram->isInitialised)
+    Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
+    if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
-    Shader *secondComputeShader = new Shader("shaders/companion_axion.glsl", ShaderType::COMPUTE_SHADER);
-    ComputeShaderProgram *secondComputeProgram = new ComputeShaderProgram(secondComputeShader);
-    if (!secondComputeProgram->isInitialised)
+    Shader *calculateAccelerationShader = new Shader("shaders/companion_axion.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
+    if (!calculateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
+    if (!updateAccelerationPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
+    if (!calculateLaplacianPass->isInitialised)
+    {
+        return nullptr;
+    }
+    Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
+    if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
 
-    delete firstComputeShader;
-    delete laplacianComputeShader;
-    delete secondComputeShader;
+    delete evolveFieldShader;
+    delete evolveVelocityShader;
+    delete calculateAccelerationShader;
+    delete updateAccelerationShader;
+    delete calculateLaplacianShader;
+    delete calculatePhaseShader;
 
-    // Single axion
+    // Companion axion
     SimulationLayout simulationLayout = {
         {UniformDataType::FLOAT, std::string("eta"), 1.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("lam"), 5.0f, 0.1f, 10.0f},
         {UniformDataType::FLOAT, std::string("axionStrength"), 0.025f, 0.1f, 5.0f},
         {UniformDataType::FLOAT, std::string("kappa"), 0.04f, 0.001f, 1.0f},
-        {UniformDataType::FLOAT, std::string("growthScale"), 75.0f, 50.0f, 100.0f},
-        {UniformDataType::FLOAT, std::string("growthLaw"), 2.0f, 1.0f, 7.0f},
+        {UniformDataType::FLOAT, std::string("tGrowthScale"), 75.0f, 50.0f, 100.0f},
+        {UniformDataType::FLOAT, std::string("tGrowthLaw"), 2.0f, 1.0f, 7.0f},
+        {UniformDataType::FLOAT, std::string("sGrowthScale"), 75.0f, 50.0f, 100.0f},
+        {UniformDataType::FLOAT, std::string("sGrowthLaw"), 2.0f, 1.0f, 7.0f},
         {UniformDataType::FLOAT, std::string("n"), 3.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("nPrime"), 1.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("m"), 1.0f, 0.0f, 10.0f},
         {UniformDataType::FLOAT, std::string("mPrime"), 1.0f, 0.0f, 10.0f},
     };
 
-    return new Simulation(2, firstComputeProgram, laplacianComputeProgram, secondComputeProgram, simulationLayout);
+    uint32_t numFields = 4;
+
+    return new Simulation(
+        numFields,
+        evolveFieldPass,
+        evolveVelocityPass,
+        calculateAccelerationPass,
+        updateAccelerationPass,
+        calculateLaplacianPass,
+        calculatePhasePass,
+        simulationLayout);
 }

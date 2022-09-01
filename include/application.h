@@ -44,9 +44,9 @@ public:
     void onSimulationUpdate();
 
 private:
-    GLFWwindow *m_windowHandle = nullptr;
-    ImGuiIO *m_imguiIO = nullptr;
-    Framebuffer *m_framebuffer = nullptr;
+    GLFWwindow *m_WindowHandle = nullptr;
+    ImGuiIO *m_ImGuiIO = nullptr;
+    Framebuffer *m_Framebuffer = nullptr;
 
     // Timing information
     double m_lastUpdateTime = 0.0f;
@@ -61,13 +61,12 @@ private:
     float m_simulationFPS = 60.0f;
 
     // Rendering
-    VertexFragmentShaderProgram *m_plotFieldProgram;
-    VertexFragmentShaderProgram *m_plotPhaseProgram;
-    VertexArray *m_mainViewportVertexArray;
+    VertexFragmentShaderProgram *m_PlotFieldProgram;
+    VertexArray *m_MainViewportVertexArray;
 
-    Simulation *m_simulation;
+    Simulation *m_Simulation;
 
-    std::shared_ptr<Texture2D> m_colorMap;
+    Texture2D *m_colorMap;
 
     int m_maxTimesteps = 1000;
 
@@ -75,6 +74,4 @@ private:
     size_t m_currentPlottingProcedureIndex = 1;
 
     const char *m_currentSimulationProcedure = "Domain walls";
-
-    bool m_showLaplacian = false;
 };

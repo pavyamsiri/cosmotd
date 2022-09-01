@@ -112,7 +112,7 @@ void VertexBuffer::unbind() const
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-IndexBuffer::IndexBuffer(uint32_t *indices, uint32_t count, BufferUsageType usageType)
+IndexBuffer::IndexBuffer(const uint32_t *indices, uint32_t count, BufferUsageType usageType)
 {
     logTrace("Creating index buffer...");
     glGenBuffers(1, &bufferID);

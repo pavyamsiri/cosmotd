@@ -55,7 +55,7 @@ VertexFragmentShaderProgram::~VertexFragmentShaderProgram()
     logTrace("Vertex/Fragment shader program deleted.");
 }
 
-void VertexFragmentShaderProgram::use()
+const void VertexFragmentShaderProgram::use() const
 {
     glUseProgram(programID);
 }
