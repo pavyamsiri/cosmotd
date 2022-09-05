@@ -20,5 +20,5 @@ void main() {
     float nextAcceleration = field.a;
 
     // Update acceleration
-    imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, 0.0f));
+    imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, nextAcceleration, nextAcceleration));
 }

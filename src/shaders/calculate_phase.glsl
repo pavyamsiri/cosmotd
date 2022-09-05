@@ -18,8 +18,8 @@ void main()
     float imagValue = imageLoad(inImagFieldTexture, pos).r;
     // Calculate phase
     float phaseAngle = atan(imagValue, realValue);
+    phaseAngle = clamp(phaseAngle, -PI, +PI);
 
-    
     // Store phase
     imageStore(outPhaseTexture, pos, vec4(phaseAngle, 0.0f, 0.0f, 0.0f));
 }

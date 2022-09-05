@@ -12,9 +12,6 @@ layout(rgba32f, binding = 2) restrict uniform image2D imagFieldTexture;
 // In: Imaginary Laplacian texture
 layout(r32f, binding = 3) readonly uniform image2D inImagLaplacianTexture;
 
-// In: Phase texture
-layout(r32f, binding = 4) readonly uniform image2D inPhaseTexture;
-
 // Universal simulation uniform parameters
 layout(location=0) uniform float time;
 layout(location=1) uniform float dt;

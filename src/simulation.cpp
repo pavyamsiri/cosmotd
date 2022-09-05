@@ -482,6 +482,14 @@ Texture2D *Simulation::getCurrentRenderTexture()
 {
     return &fields[renderIndex];
 }
+Texture2D *Simulation::getCurrentRealTexture()
+{
+    return &fields[renderIndex];
+}
+Texture2D *Simulation::getCurrentImagTexture()
+{
+    return &fields[(renderIndex + 1) % fields.size()];
+}
 
 Texture2D *Simulation::getCurrentLaplacian()
 {

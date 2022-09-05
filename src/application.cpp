@@ -305,8 +305,8 @@ void Application::onRender()
     {
         m_PlotPhaseProgram->use();
         m_colorMap->bind(0);
-        m_Simulation->getRenderTexture(0)->bind(1);
-        m_Simulation->getRenderTexture(1)->bind(2);
+        m_Simulation->getCurrentRealTexture()->bind(1);
+        m_Simulation->getCurrentImagTexture()->bind(2);
     }
     // Plot the Laplacian
     else if (m_currentPlottingProcedureIndex == 3)

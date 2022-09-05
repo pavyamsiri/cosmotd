@@ -167,6 +167,8 @@ public:
 
     Texture2D *getRenderTexture(uint32_t fieldIndex);
     Texture2D *getCurrentRenderTexture();
+    Texture2D *getCurrentRealTexture();
+    Texture2D *getCurrentImagTexture();
     Texture2D *getCurrentLaplacian();
     Texture2D *getCurrentPhase();
 
