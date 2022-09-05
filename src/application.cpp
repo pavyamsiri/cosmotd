@@ -189,7 +189,7 @@ Application::Application(int width, int height, const char *title)
 
     this->m_simulation = Simulation::createDomainWallSimulation();
 
-    m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
+    m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np20228.ctdd"));
 
     m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
 
@@ -506,25 +506,25 @@ void Application::onImGuiRender()
                     {
                         m_simulation = Simulation::createDomainWallSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np486761876.ctdd"));
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np20228.ctdd"));
                     }
                     else if (n == 1)
                     {
                         m_simulation = Simulation::createCosmicStringSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np16579.ctdd"));
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/cosmic_strings_M200_N200_np20228.ctdd"));
                     }
                     else if (n == 2)
                     {
                         m_simulation = Simulation::createSingleAxionSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_n1.ctdd"));
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/single_axion_M300_N300_np20228.ctdd"));
                     }
                     else if (n == 3)
                     {
                         m_simulation = Simulation::createCompanionAxionSimulation();
                         // Set field
-                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M200_N200_np23213241.ctdd"));
+                        m_simulation->setField(Texture2D::loadFromCTDDFile("data/companion_axion_M300_N300_np20228.ctdd"));
                     }
                 }
                 if (isSelected)

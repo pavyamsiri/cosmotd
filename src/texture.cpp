@@ -94,6 +94,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
     uint32_t numFields;
     uint32_t M;
     uint32_t N;
+    float currentTime;
 
     std::ifstream dataFile;
     dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -114,6 +115,7 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         {
             dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
             dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            dataFile.read(reinterpret_cast<char *>(&currentTime), sizeof(float));
             logTrace("Field %d - M = %d, N = %d", fieldIndex, M, N);
             std::vector<float> textureData(M * N * 4);
             for (int rowIndex = 0; rowIndex < M; rowIndex++)
@@ -123,18 +125,16 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
                     float fieldValue;
                     float fieldVelocity;
-                    float fieldAcceleration;
 
                     dataFile.read(reinterpret_cast<char *>(&fieldValue), sizeof(float));
                     dataFile.read(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
-                    dataFile.read(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
 
                     // Red channel - field value
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0] = fieldValue;
                     // Green channel - field velocity
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1] = fieldVelocity;
                     // Blue channel - field accleration
-                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = fieldAcceleration;
+                    textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = 0.0f;
                     // TODO: Having the alpha channel store time is pretty hacky and should be removed. It should just be a
                     // uniform. A uniform can't be written to so a buffer?
                     // Alpha channel - current time
