@@ -269,18 +269,19 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    if (m_currentPlottingProcedureIndex == 0 || m_Simulation->fields.size() < 2)
+    if (m_currentPlottingProcedureIndex == 0 || (m_currentPlottingProcedureIndex == 1 && (m_Simulation->fields.size() < 2)))
     {
         m_PlotFieldProgram->use();
         glUniform1f(0, m_Simulation->getMaxValue());
         m_colorMap->bind(0);
         m_Simulation->getCurrentRenderTexture()->bind(1);
     }
-    else if (m_currentPlottingProcedureIndex == 1)
+    else if (m_currentPlottingProcedureIndex == 1 && m_Simulation->fields.size() >= 2)
     {
         m_PlotFieldProgram->use();
         glUniform1f(0, M_PI);
         m_colorMap->bind(0);
+        // m_Simulation->getCurrentRenderTexture()->bind(1);
         m_Simulation->getCurrentPhase()->bind(1);
     }
     else if (m_currentPlottingProcedureIndex == 2)
@@ -394,8 +395,6 @@ void Application::onImGuiRender()
                 std::vector<std::shared_ptr<Texture2D>> loadedTextures = Texture2D::loadFromCTDDFile(outPath);
                 logTrace("The new ctdd contains %d fields", loadedTextures.size());
                 m_Simulation->setField(loadedTextures);
-                m_Simulation->originalFields = loadedTextures;
-                m_Simulation->originalFields.resize(loadedTextures.size());
 
                 // Free file path after use
                 NFD_FreePath(outPath);

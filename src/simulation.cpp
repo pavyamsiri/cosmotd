@@ -58,9 +58,6 @@ void Simulation::update()
         return;
     }
 
-    static const int xNumGroups = ceil(fields[0].width / 4);
-    static const int yNumGroups = ceil(fields[0].height / 4);
-
     // Evolve field and time for all fields first
     for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
@@ -71,7 +68,7 @@ void Simulation::update()
         glActiveTexture(GL_TEXTURE0);
         glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
-        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         // Update time
@@ -86,66 +83,20 @@ void Simulation::update()
         glActiveTexture(GL_TEXTURE1);
         glBindImageTexture(1, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
         // Dispatch and barrier
-        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
 
     // Calculate phase if there is more than one field
-    if (fields.size() > 1)
+    if (fields.size() > 1 && m_PhaseTextures.size() > 0)
     {
-        // Bind two textures at once and calculate the phase
-        for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex += 2)
-        {
-            m_CalculatePhasePass->use();
-            // Real part
-            glActiveTexture(GL_TEXTURE0);
-            glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            // Imaginary part
-            glActiveTexture(GL_TEXTURE1);
-            glBindImageTexture(1, fields[fieldIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            // Output phase texture
-            glActiveTexture(GL_TEXTURE2);
-            glBindImageTexture(2, m_PhaseTextures[floor(fieldIndex / 2)].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-            // Dispatch and barrier
-            glDispatchCompute(xNumGroups, yNumGroups, 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        }
+        calculatePhase();
     }
 
-    // Calculate the acceleration
-    m_CalculateAccelerationPass->use();
-    glUniform1f(0, timestep * dt);
-    glUniform1f(1, dt);
-    glUniform1i(2, era);
-    bindUniforms();
-    uint32_t bindIndex = 0;
-    uint32_t activeTextureIndex = GL_TEXTURE0;
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
-    {
-        // Bind field
-        glActiveTexture(activeTextureIndex++);
-        glBindImageTexture(bindIndex++, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        // Bind its Laplacian
-        glActiveTexture(activeTextureIndex++);
-        glBindImageTexture(bindIndex++, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-    }
+    // Calculate next acceleration
+    calculateAcceleration();
 
-    // Bind phases if they exist
-    if (m_PhaseTextures.size() > 0)
-    {
-        for (const auto &phaseTexture : m_PhaseTextures)
-        {
-            // Bind its phase
-            glActiveTexture(activeTextureIndex++);
-            glBindImageTexture(bindIndex++, phaseTexture.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-        }
-    }
-
-    // Dispatch and barrier
-    glDispatchCompute(xNumGroups, yNumGroups, 1);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    // Update velocity and acceleration
+    // Update velocity
     for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex += 2)
     {
         // Calculate and update the velocity
@@ -155,19 +106,11 @@ void Simulation::update()
         glActiveTexture(GL_TEXTURE0);
         glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
-        glDispatchCompute(xNumGroups, yNumGroups, 1);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-        // Now acceleration can be updated
-        m_UpdateAccelerationPass->use();
-        glUniform1f(0, dt);
-        // Bind field
-        glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-        // Dispatch and barrier
-        glDispatchCompute(xNumGroups, yNumGroups, 1);
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
+
+    updateAcceleration();
 }
 
 void Simulation::bindUniforms()
@@ -271,7 +214,10 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
-    ImGui::Checkbox("Running", &runFlag);
+    if (ImGui::Checkbox("Running", &runFlag) && runFlag)
+    {
+        initialiseSimulation();
+    }
 
     // Reset button
     if (ImGui::Button("Reset field"))
@@ -399,8 +345,13 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         return;
     }
 
+    logTrace("This simulation has %d number of required fields", m_NumFields);
+    logTrace("The size of the fields vector is %d", fields.size());
+    logTrace("The size of the phase vector is %d", m_PhaseTextures.size());
+    logTrace("The size of the Laplacian vector is %d", m_LaplacianTextures.size());
+
     // Reset timestep
-    timestep = 0;
+    timestep = 1;
 
     // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
     // reset to the original field.
@@ -409,11 +360,18 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     // Copy texture data over
     for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
+        logTrace("Field Index = %d", fieldIndex);
+        logTrace("Source field index = %d", newFields[fieldIndex]->textureID);
+        logTrace("Dest field index = %d", fields[fieldIndex].textureID);
         // Set width and height for textures
         uint32_t height = newFields[fieldIndex]->height;
         uint32_t width = newFields[fieldIndex]->width;
         fields[fieldIndex].width = width;
         fields[fieldIndex].height = height;
+
+        // Set work groups
+        m_XNumGroups = ceil(width / 4);
+        m_YNumGroups = ceil(height / 4);
 
         // Allocate data for textures
         glBindTexture(GL_TEXTURE_2D, fields[fieldIndex].textureID);
@@ -441,6 +399,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         if (m_PhaseTextures.size() > 0)
         {
             size_t phaseIndex = floor(fieldIndex / 2);
+            logTrace("Resizing phase textures, index = %d", phaseIndex);
             if (m_PhaseTextures[phaseIndex].width != width || m_PhaseTextures[phaseIndex].height != height)
             {
                 // Create new texture because old texture is of the wrong size
@@ -452,9 +411,9 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
                 m_PhaseTextures[phaseIndex].height = height;
             }
         }
-
-        fieldIndex++;
     }
+
+    initialiseSimulation();
 }
 
 void Simulation::saveFields(const char *filePath)
@@ -810,4 +769,92 @@ Simulation *Simulation::createCompanionAxionSimulation()
         calculateLaplacianPass,
         calculatePhasePass,
         simulationLayout);
+}
+
+void Simulation::calculatePhase()
+{
+    // Bind two textures at once and calculate the phase
+    for (size_t phaseIndex = 0; phaseIndex < m_PhaseTextures.size(); phaseIndex++)
+    {
+        m_CalculatePhasePass->use();
+        // Real part
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, fields[(size_t)2 * phaseIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        // Imaginary part
+        glActiveTexture(GL_TEXTURE1);
+        glBindImageTexture(1, fields[(size_t)2 * phaseIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        // Output phase texture
+        glActiveTexture(GL_TEXTURE2);
+        glBindImageTexture(2, m_PhaseTextures[phaseIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+        // Dispatch and barrier
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+}
+
+void Simulation::calculateAcceleration()
+{
+    // Calculate the acceleration
+    m_CalculateAccelerationPass->use();
+    glUniform1f(0, timestep * dt);
+    glUniform1f(1, dt);
+    glUniform1i(2, era);
+    bindUniforms();
+    uint32_t bindIndex = 0;
+    uint32_t activeTextureIndex = GL_TEXTURE0;
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    {
+        // Bind field
+        glActiveTexture(activeTextureIndex++);
+        glBindImageTexture(bindIndex++, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Bind its Laplacian
+        glActiveTexture(activeTextureIndex++);
+        glBindImageTexture(bindIndex++, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+    }
+
+    // Bind phases if they exist
+    if (m_PhaseTextures.size() > 0)
+    {
+        for (const auto &phaseTexture : m_PhaseTextures)
+        {
+            // Bind its phase
+            glActiveTexture(activeTextureIndex++);
+            glBindImageTexture(bindIndex++, phaseTexture.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+        }
+    }
+
+    // Dispatch and barrier
+    glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+}
+
+void Simulation::updateAcceleration()
+{
+    // Update acceleration
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    {
+        // Now acceleration can be updated
+        m_UpdateAccelerationPass->use();
+        glUniform1f(0, dt);
+        // Bind field
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        // Dispatch and barrier
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+}
+
+void Simulation::initialiseSimulation()
+{
+    // Calculate phase if needed
+    if (fields.size() > 1)
+    {
+        calculatePhase();
+    }
+
+    // Update acceleration but not value or velocity
+    calculateAcceleration();
+    updateAcceleration();
 }

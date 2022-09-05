@@ -91,7 +91,7 @@ public:
           m_CalculateAccelerationPass(calculateAccelerationPass),
           m_UpdateAccelerationPass(updateAccelerationPass),
           m_CalculateLaplacianPass(calculateLaplacianPass),
-          m_CalculatePhasePass(calculateLaplacianPass),
+          m_CalculatePhasePass(calculatePhasePass),
           layout(layout)
     {
         // Resize vectors to the correct number of fields
@@ -175,6 +175,11 @@ public:
     float getCurrentSimulationTime();
     int getCurrentSimulationTimestep();
 
+    void initialiseSimulation();
+    void calculateAcceleration();
+    void updateAcceleration();
+    void calculatePhase();
+
     static Simulation *createDomainWallSimulation();
     static Simulation *createCosmicStringSimulation();
     static Simulation *createSingleAxionSimulation();
@@ -219,4 +224,7 @@ private:
     int32_t renderIndex = 0;
 
     uint32_t m_NumFields = 0;
+
+    uint32_t m_XNumGroups = 0;
+    uint32_t m_YNumGroups = 0;
 };

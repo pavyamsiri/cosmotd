@@ -98,6 +98,8 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
     uint32_t N;
     float simulationTime;
 
+    logTrace("Loading fields from file located at path %s", filePath);
+
     std::ifstream dataFile;
     dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     try
@@ -106,17 +108,16 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
         // Read header
         dataFile.read(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
 
-        logTrace("Number of fields = %d", numFields);
-
         // Create list of textures
-        std::vector<std::shared_ptr<Texture2D>>
-            fields(numFields);
+        std::vector<std::shared_ptr<Texture2D>> fields(numFields);
 
+        logTrace("Number of fields = %d", fields.size());
         // Read data
         for (int fieldIndex = 0; fieldIndex < numFields; fieldIndex++)
         {
             dataFile.read(reinterpret_cast<char *>(&M), sizeof(uint32_t));
             dataFile.read(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            // TODO: Currently, the current time of the simulation is stored here, however there is no way to use it currently.
             dataFile.read(reinterpret_cast<char *>(&simulationTime), sizeof(float));
             logTrace("Field %d - M = %d, N = %d, currentTime = %f", fieldIndex, M, N, simulationTime);
             std::vector<float> textureData(M * N * 4);
@@ -127,7 +128,6 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
                     float fieldValue;
                     float fieldVelocity;
-                    float fieldAcceleration;
 
                     dataFile.read(reinterpret_cast<char *>(&fieldValue), sizeof(float));
                     dataFile.read(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
@@ -136,6 +136,8 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0] = fieldValue;
                     // Green channel - field velocity
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1] = fieldVelocity;
+                    // Acceleration is initialised to zero. It needs to be initialised by the simulation itself, as the simulation
+                    // parameters will affect the calculation.
                     // Blue channel - current field acceleration
                     textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2] = 0.0f;
                     // Alpha channel - next field acceleration
@@ -153,6 +155,8 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *
 
             glTextureStorage2D(fields[fieldIndex]->textureID, 1, GL_RGBA32F, N, M);
             glBindImageTexture(0, fields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+            logTrace("Filled out texture %d out of %d", fieldIndex, fields.size());
 
             textureData.clear();
         }
