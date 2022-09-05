@@ -144,15 +144,27 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
-    // Create shader programs
+    Shader *plotPhaseShader = new Shader("shaders/plot_phase.glsl", ShaderType::FRAGMENT_SHADER);
+    if (!plotPhaseShader->isInitialised)
+    {
+        return;
+    }
+    // Create field shader program
     VertexFragmentShaderProgram *plotFieldProgram = new VertexFragmentShaderProgram(vertexShader, plotFieldShader);
     if (!plotFieldProgram->isInitialised)
+    {
+        return;
+    }
+    // Create shader programs
+    VertexFragmentShaderProgram *plotPhaseProgram = new VertexFragmentShaderProgram(vertexShader, plotPhaseShader);
+    if (!plotPhaseProgram->isInitialised)
     {
         return;
     }
 
     // Save shader programs
     this->m_PlotFieldProgram = plotFieldProgram;
+    this->m_PlotPhaseProgram = plotPhaseProgram;
 
     // Delete shaders as they are no longer necessary
     delete vertexShader;
@@ -269,27 +281,48 @@ void Application::onRender()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    if (m_currentPlottingProcedureIndex == 0 || (m_currentPlottingProcedureIndex == 1 && (m_Simulation->fields.size() < 2)))
+    bool phaseAvailable = m_Simulation->fields.size() >= 2;
+
+    // Plot the field
+    if (m_currentPlottingProcedureIndex == 0)
     {
         m_PlotFieldProgram->use();
         glUniform1f(0, m_Simulation->getMaxValue());
         m_colorMap->bind(0);
         m_Simulation->getCurrentRenderTexture()->bind(1);
     }
-    else if (m_currentPlottingProcedureIndex == 1 && m_Simulation->fields.size() >= 2)
+    // Plot the raw phase (sample from phase texture)
+    else if (m_currentPlottingProcedureIndex == 1 && phaseAvailable)
     {
+
         m_PlotFieldProgram->use();
         glUniform1f(0, M_PI);
         m_colorMap->bind(0);
-        // m_Simulation->getCurrentRenderTexture()->bind(1);
         m_Simulation->getCurrentPhase()->bind(1);
     }
-    else if (m_currentPlottingProcedureIndex == 2)
+    // Plot the smooth phase (sample from real and imaginary fields and compute. This is smoother looking due to the linear interpolation)
+    else if (m_currentPlottingProcedureIndex == 2 && phaseAvailable)
+    {
+        m_PlotPhaseProgram->use();
+        m_colorMap->bind(0);
+        m_Simulation->getRenderTexture(0)->bind(1);
+        m_Simulation->getRenderTexture(1)->bind(2);
+    }
+    // Plot the Laplacian
+    else if (m_currentPlottingProcedureIndex == 3)
     {
         m_PlotFieldProgram->use();
         glUniform1f(0, m_Simulation->getMaxValue());
         m_colorMap->bind(0);
         m_Simulation->getCurrentLaplacian()->bind(1);
+    }
+    // For undefined indices or if the phase is unavailable, just plot the phase
+    else
+    {
+        m_PlotFieldProgram->use();
+        glUniform1f(0, m_Simulation->getMaxValue());
+        m_colorMap->bind(0);
+        m_Simulation->getCurrentRenderTexture()->bind(1);
     }
 
     // Bind VAO
@@ -455,7 +488,7 @@ void Application::onImGuiRender()
             }
         }
 
-        const char *availablePlottingProcedures[] = {"Field", "Phase", "Laplacian"};
+        const char *availablePlottingProcedures[] = {"Field", "Raw Phase", "Smooth Phase", "Laplacian"};
 
         if (ImGui::BeginCombo("Plotting", m_currentPlottingProcedure))
         {

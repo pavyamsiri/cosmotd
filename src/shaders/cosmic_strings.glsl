@@ -51,7 +51,7 @@ void main() {
     // 'Damping' term
     realNextAcceleration -= ALPHA_2D * (era / time) * realCurrentVelocity;
     // Potential derivative
-    realNextAcceleration -= lam * (pow(realNextValue, 2) - pow(eta, 2)) * realNextValue;
+    realNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * realNextValue;
 
     // Evolve acceleration of imaginary field
     // Laplacian term
@@ -59,7 +59,7 @@ void main() {
     // 'Damping' term
     imagNextAcceleration -= ALPHA_2D * (era / time) * imagCurrentVelocity;
     // Potential derivative
-    imagNextAcceleration -= lam * (pow(imagNextValue, 2) - pow(eta, 2)) * imagNextValue;
+    imagNextAcceleration -= lam * (squareAmplitude - pow(eta, 2)) * imagNextValue;
 
     // Store results
     imageStore(realFieldTexture, pos, vec4(realNextValue, realCurrentVelocity, realCurrentAcceleration, realNextAcceleration));

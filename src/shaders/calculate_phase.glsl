@@ -8,15 +8,18 @@ layout(rgba32f, binding = 1) readonly uniform image2D inImagFieldTexture;
 // Out: Phase texture
 layout(r32f, binding = 2) writeonly uniform image2D outPhaseTexture;
 
+const float PI = 3.1415926535897932384626433832795f;
+
 void main()
 {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     ivec2 size = imageSize(inRealFieldTexture);
-    vec4 realValue = imageLoad(inRealFieldTexture, pos);
-    vec4 imagValue = imageLoad(inImagFieldTexture, pos);
+    float realValue = imageLoad(inRealFieldTexture, pos).r;
+    float imagValue = imageLoad(inImagFieldTexture, pos).r;
     // Calculate phase
-    vec4 phaseAngle = atan(imagValue, realValue);
+    float phaseAngle = atan(imagValue, realValue);
+
     
     // Store phase
-    imageStore(outPhaseTexture, pos, vec4(phaseAngle.r, 0.0f, 0.0f, 0.0f));
+    imageStore(outPhaseTexture, pos, vec4(phaseAngle, 0.0f, 0.0f, 0.0f));
 }

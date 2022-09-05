@@ -97,7 +97,7 @@ void Simulation::update()
     calculateAcceleration();
 
     // Update velocity
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex += 2)
+    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
         // Calculate and update the velocity
         m_EvolveVelocityPass->use();
@@ -357,7 +357,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     // reset to the original field.
     originalFields = std::vector<std::shared_ptr<Texture2D>>(newFields);
 
-    // Copy texture data over
+    // Copy texture data overglClearTexImage
     for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
     {
         logTrace("Field Index = %d", fieldIndex);
@@ -393,6 +393,10 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
             m_LaplacianTextures[fieldIndex].height = height;
         }
 
+        // Clear the Laplacian texture
+        static float clearColor = 0.0f;
+        glClearTexImage(m_LaplacianTextures[fieldIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
+
         // Resize phase texture sizes if necessary
         // TODO: This might happen twice more than necessary, however if the resizing is successful on the first go then
         // it probably is fine, as the second go would be properly sized.
@@ -410,6 +414,8 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
                 m_PhaseTextures[phaseIndex].width = width;
                 m_PhaseTextures[phaseIndex].height = height;
             }
+            // Clear the phase texture
+            glClearTexImage(m_PhaseTextures[phaseIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
         }
     }
 

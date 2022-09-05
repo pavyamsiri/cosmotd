@@ -62,6 +62,7 @@ private:
 
     // Rendering
     VertexFragmentShaderProgram *m_PlotFieldProgram;
+    VertexFragmentShaderProgram *m_PlotPhaseProgram;
     VertexArray *m_MainViewportVertexArray;
 
     Simulation *m_Simulation;
@@ -70,8 +71,8 @@ private:
 
     int m_maxTimesteps = 1000;
 
-    const char *m_currentPlottingProcedure = "Phase";
-    size_t m_currentPlottingProcedureIndex = 1;
+    const char *m_currentPlottingProcedure = "Smooth Phase";
+    size_t m_currentPlottingProcedureIndex = 2;
 
     const char *m_currentSimulationProcedure = "Domain walls";
 };

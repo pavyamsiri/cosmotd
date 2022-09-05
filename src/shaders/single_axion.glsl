@@ -50,6 +50,7 @@ void main() {
     float imagCurrentAcceleration = imagField.b;
     // Phase
     float phase = imageLoad(inPhaseTexture, pos).r;
+    // float phase = atan(imagNextValue, realNextValue);
 
     // Square amplitude of complex field
     float squareAmplitude = pow(realNextValue, 2) + pow(imagNextValue, 2);
