@@ -191,7 +191,7 @@ Application::Application(int width, int height, const char *title)
 
     m_simulation->setField(Texture2D::loadFromCTDDFile("data/domain_walls_M200_N200_np20228.ctdd"));
 
-    m_colorMap = Texture2D::loadFromCTDDFile("colormaps/twilight_shifted_colormap.ctdd")[0];
+    m_colorMap = Texture2D::loadFromPNG("colormaps/twilight_shifted_colormap.png");
 
     // Initialisation complete
     this->isInitialised = true;
@@ -450,11 +450,11 @@ void Application::onImGuiRender()
         if (ImGui::Button("Change colormap"))
         {
             nfdchar_t *outPath;
-            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdfilteritem_t filterItem[1] = {{"Portable Network Graphics", "png"}};
             nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, NULL);
             if (result == NFD_OKAY)
             {
-                m_colorMap = Texture2D::loadFromCTDDFile(outPath)[0];
+                m_colorMap = Texture2D::loadFromPNG(outPath);
 
                 // Free file path after use
                 NFD_FreePath(outPath);

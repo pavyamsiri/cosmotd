@@ -67,7 +67,7 @@ private:
 
     Simulation *m_simulation;
 
-    std::shared_ptr<Texture2D> m_colorMap;
+    Texture2D *m_colorMap;
 
     int m_maxTimesteps = 1000;
 
