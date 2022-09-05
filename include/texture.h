@@ -56,5 +56,6 @@ public:
 
     // Initialisers
     static std::vector<std::shared_ptr<Texture2D>> loadFromCTDDFile(const char *filePath);
+    static Texture2D *loadFromPNG(const char *filePath);
     static std::vector<std::shared_ptr<Texture2D>> createTextures(uint32_t width, uint32_t height, uint32_t size);
 };

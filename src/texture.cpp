@@ -188,3 +188,16 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::createTextures(uint32_t width
 
     return fields;
 }
+
+Texture2D *Texture2D::loadFromPNG(const char *filePath)
+{
+    int width, height, bpp;
+    unsigned char *data = stbi_load(filePath, &width, &height, &bpp, STBI_rgb);
+    // Create new texture
+    Texture2D *pngTexture = new Texture2D();
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+
+    stbi_image_free(data);
+    return pngTexture;
+}
