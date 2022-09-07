@@ -84,6 +84,9 @@ public:
         ComputeShaderProgram *updateAccelerationPass,
         ComputeShaderProgram *calculateLaplacianPass,
         ComputeShaderProgram *calculatePhasePass,
+        bool requiresPhase,
+        ComputeShaderProgram *detectStringsPass,
+        bool hasStrings,
         SimulationLayout layout)
         : m_NumFields(numFields),
           m_EvolveFieldPass(evolveFieldPass),
@@ -92,12 +95,16 @@ public:
           m_UpdateAccelerationPass(updateAccelerationPass),
           m_CalculateLaplacianPass(calculateLaplacianPass),
           m_CalculatePhasePass(calculatePhasePass),
+          m_RequiresPhase(requiresPhase),
+          m_DetectStringsPass(detectStringsPass),
+          m_HasStrings(hasStrings),
           layout(layout)
     {
         // Resize vectors to the correct number of fields
         fields.resize(m_NumFields);
         m_LaplacianTextures.resize(m_NumFields);
         m_PhaseTextures.resize(floor(m_NumFields / 2));
+        m_StringTextures.resize(floor(m_NumFields / 2));
 
         // Create uniform values
         for (const auto &element : layout.elements)
@@ -157,7 +164,10 @@ public:
     void setField(std::vector<std::shared_ptr<Texture2D>> startFields);
 
     void saveFields(const char *filePath);
-    void savePhase(const char *filePath);
+    void savePhases(const char *filePath);
+    // TODO: WARNING this currently ignores the fact that for four fields and above, the string numbers vector will take both
+    // string counts into a single flat vector. Hence this does not work properly for more than two fields.
+    void saveStringNumbers(const char *filePath);
 
     void update();
 
@@ -171,6 +181,7 @@ public:
     Texture2D *getCurrentImagTexture();
     Texture2D *getCurrentLaplacian();
     Texture2D *getCurrentPhase();
+    Texture2D *getCurrentStrings();
 
     float getMaxValue();
 
@@ -181,6 +192,10 @@ public:
     void calculateAcceleration();
     void updateAcceleration();
     void calculatePhase();
+    void detectStrings();
+
+    int getCurrentStringNumber();
+    int getStringNumber(size_t stringIndex);
 
     static Simulation *createDomainWallSimulation();
     static Simulation *createCosmicStringSimulation();
@@ -191,6 +206,9 @@ private:
     // Field data
     std::vector<Texture2D> m_LaplacianTextures;
     std::vector<Texture2D> m_PhaseTextures;
+    std::vector<Texture2D> m_StringTextures;
+    // Number of strings
+    std::vector<int> m_StringNumbers;
 
     // Calculate and update field
     ComputeShaderProgram *m_EvolveFieldPass;
@@ -206,6 +224,9 @@ private:
 
     // Calculate the phase if there are multiple fields
     ComputeShaderProgram *m_CalculatePhasePass;
+
+    // Detect the strings
+    ComputeShaderProgram *m_DetectStringsPass;
 
     // Universal parameters
     float dx = 1.0f;
@@ -229,4 +250,7 @@ private:
 
     uint32_t m_XNumGroups = 0;
     uint32_t m_YNumGroups = 0;
+
+    bool m_RequiresPhase = false;
+    bool m_HasStrings = false;
 };

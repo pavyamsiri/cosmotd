@@ -92,6 +92,11 @@ void Simulation::update()
     {
         calculatePhase();
     }
+    // Detect strings if requested
+    if (m_HasStrings && fields.size() > 1 && m_StringTextures.size() > 0)
+    {
+        detectStrings();
+    }
 
     // Calculate next acceleration
     calculateAcceleration();
@@ -216,7 +221,7 @@ void Simulation::onUIRender()
 {
     if (ImGui::Checkbox("Running", &runFlag) && runFlag)
     {
-        initialiseSimulation();
+        // initialiseSimulation();
     }
 
     // Reset button
@@ -349,6 +354,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     logTrace("The size of the fields vector is %d", fields.size());
     logTrace("The size of the phase vector is %d", m_PhaseTextures.size());
     logTrace("The size of the Laplacian vector is %d", m_LaplacianTextures.size());
+    logTrace("The size of the string vector is %d", m_StringTextures.size());
 
     // Reset timestep
     timestep = 1;
@@ -417,9 +423,26 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
             // Clear the phase texture
             glClearTexImage(m_PhaseTextures[phaseIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
         }
+        if (m_PhaseTextures.size() > 0)
+        {
+            size_t stringIndex = floor(fieldIndex / 2);
+            logTrace("Resizing string textures, index = %d", stringIndex);
+            if (m_StringTextures[stringIndex].width != width || m_StringTextures[stringIndex].height != height)
+            {
+                // Create new texture because old texture is of the wrong size
+                m_StringTextures[stringIndex] = Texture2D();
+
+                glBindTexture(GL_TEXTURE_2D, m_StringTextures[stringIndex].textureID);
+                glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, width, height);
+                m_StringTextures[stringIndex].width = width;
+                m_StringTextures[stringIndex].height = height;
+            }
+            // Clear the phase texture
+            glClearTexImage(m_StringTextures[stringIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
+        }
     }
 
-    initialiseSimulation();
+    // initialiseSimulation();
 }
 
 void Simulation::saveFields(const char *filePath)
@@ -440,10 +463,12 @@ void Simulation::saveFields(const char *filePath)
             glBindTexture(GL_TEXTURE_2D, currentField.textureID);
             int M, N;
             int miplevel = 0;
+            float currentTime = getCurrentSimulationTime();
             glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
             glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
             dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
             dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&currentTime), sizeof(float));
 
             std::vector<float> textureData(M * N * 4);
 
@@ -456,16 +481,93 @@ void Simulation::saveFields(const char *filePath)
                     size_t currentIndex = (rowIndex * 4 * N) + 4 * columnIndex;
                     float fieldValue = textureData[currentIndex + 0];
                     float fieldVelocity = textureData[currentIndex + 1];
-                    float fieldAcceleration = textureData[currentIndex + 2];
                     dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
                     dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
-                    dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
                 }
             }
         }
 
         dataFile.close();
         logTrace("Successfully wrote field data to binary file!");
+    }
+    catch (std::ifstream::failure &e)
+    {
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
+    }
+}
+
+void Simulation::savePhases(const char *filePath)
+{
+    std::ofstream dataFile;
+    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        uint32_t numFields = m_PhaseTextures.size();
+
+        dataFile.open(filePath, std::ios::binary);
+        // Write header
+        dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
+
+        // Read data
+        for (const auto &currentPhase : m_PhaseTextures)
+        {
+            glBindTexture(GL_TEXTURE_2D, currentPhase.textureID);
+            int M, N;
+            int miplevel = 0;
+            float currentTime = getCurrentSimulationTime();
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
+            dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&currentTime), sizeof(float));
+
+            std::vector<float> textureData(M * N);
+
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, static_cast<void *>(textureData.data()));
+            glBindTexture(GL_TEXTURE_2D, 0);
+            for (int rowIndex = 0; rowIndex < M; rowIndex++)
+            {
+                for (int columnIndex = 0; columnIndex < N; columnIndex++)
+                {
+                    size_t currentIndex = (rowIndex * N) + columnIndex;
+                    float phaseValue = textureData[currentIndex];
+                    float fillerValue = 0;
+                    dataFile.write(reinterpret_cast<char *>(&phaseValue), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fillerValue), sizeof(float));
+                }
+            }
+        }
+
+        dataFile.close();
+        logTrace("Successfully wrote phase data to binary file!");
+    }
+    catch (std::ifstream::failure &e)
+    {
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
+    }
+}
+
+void Simulation::saveStringNumbers(const char *filePath)
+{
+    std::ofstream dataFile;
+    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        uint32_t numTimesteps = m_StringNumbers.size();
+
+        dataFile.open(filePath, std::ios::binary);
+        // Write header
+        dataFile.write(reinterpret_cast<char *>(&numTimesteps), sizeof(uint32_t));
+
+        // Read data
+        for (int stringCount : m_StringNumbers)
+        {
+            dataFile.write(reinterpret_cast<char *>(&stringCount), sizeof(int));
+            logInfo("String count = %d", stringCount);
+        }
+
+        dataFile.close();
+        logTrace("Successfully wrote string count data to binary file!");
     }
     catch (std::ifstream::failure &e)
     {
@@ -484,11 +586,12 @@ Texture2D *Simulation::getCurrentRenderTexture()
 }
 Texture2D *Simulation::getCurrentRealTexture()
 {
-    return &fields[renderIndex];
+    return &fields[floor(renderIndex / 2)];
 }
 Texture2D *Simulation::getCurrentImagTexture()
 {
-    return &fields[(renderIndex + 1) % fields.size()];
+    size_t imagIndex = (((int)floor(renderIndex / 2) + 1)) % fields.size();
+    return &fields[imagIndex];
 }
 
 Texture2D *Simulation::getCurrentLaplacian()
@@ -499,6 +602,11 @@ Texture2D *Simulation::getCurrentLaplacian()
 Texture2D *Simulation::getCurrentPhase()
 {
     return &m_PhaseTextures[floor(renderIndex / 2)];
+}
+
+Texture2D *Simulation::getCurrentStrings()
+{
+    return &m_StringTextures[floor(renderIndex / 2)];
 }
 
 float Simulation::getMaxValue()
@@ -525,35 +633,34 @@ Simulation *Simulation::createDomainWallSimulation()
     {
         return nullptr;
     }
+    delete evolveFieldShader;
     Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
     if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
+    delete evolveVelocityShader;
     Shader *calculateAccelerationShader = new Shader("shaders/domain_walls.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
     if (!calculateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateAccelerationShader;
     Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
     if (!updateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete updateAccelerationShader;
     Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
     if (!calculateLaplacianPass->isInitialised)
     {
         return nullptr;
     }
-
-    delete evolveFieldShader;
-    delete evolveVelocityShader;
-    delete calculateAccelerationShader;
-    delete updateAccelerationShader;
     delete calculateLaplacianShader;
 
     // Domain wall
@@ -571,6 +678,9 @@ Simulation *Simulation::createDomainWallSimulation()
         updateAccelerationPass,
         calculateLaplacianPass,
         nullptr,
+        false,
+        nullptr,
+        false,
         simulationLayout);
 }
 
@@ -583,43 +693,49 @@ Simulation *Simulation::createCosmicStringSimulation()
     {
         return nullptr;
     }
+    delete evolveFieldShader;
     Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
     if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
+    delete evolveVelocityShader;
     Shader *calculateAccelerationShader = new Shader("shaders/cosmic_strings.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
     if (!calculateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateAccelerationShader;
     Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
     if (!updateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete updateAccelerationShader;
     Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
     if (!calculateLaplacianPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateLaplacianShader;
     Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
     if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
-
-    delete evolveFieldShader;
-    delete evolveVelocityShader;
-    delete calculateAccelerationShader;
-    delete updateAccelerationShader;
-    delete calculateLaplacianShader;
     delete calculatePhaseShader;
+    Shader *detectStringsShader = new Shader("shaders/detect_strings.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *detectStringsPass = new ComputeShaderProgram(detectStringsShader);
+    if (!detectStringsPass->isInitialised)
+    {
+        return nullptr;
+    }
+    delete detectStringsShader;
 
     // Cosmic string
     SimulationLayout simulationLayout = {
@@ -636,6 +752,9 @@ Simulation *Simulation::createCosmicStringSimulation()
         updateAccelerationPass,
         calculateLaplacianPass,
         calculatePhasePass,
+        false,
+        detectStringsPass,
+        true,
         simulationLayout);
 }
 
@@ -648,43 +767,49 @@ Simulation *Simulation::createSingleAxionSimulation()
     {
         return nullptr;
     }
+    delete evolveFieldShader;
     Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
     if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
+    delete evolveVelocityShader;
     Shader *calculateAccelerationShader = new Shader("shaders/single_axion.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
     if (!calculateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateAccelerationShader;
     Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
     if (!updateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete updateAccelerationShader;
     Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
     if (!calculateLaplacianPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateLaplacianShader;
     Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
     if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
-
-    delete evolveFieldShader;
-    delete evolveVelocityShader;
-    delete calculateAccelerationShader;
-    delete updateAccelerationShader;
-    delete calculateLaplacianShader;
     delete calculatePhaseShader;
+    Shader *detectStringsShader = new Shader("shaders/detect_strings.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *detectStringsPass = new ComputeShaderProgram(detectStringsShader);
+    if (!detectStringsPass->isInitialised)
+    {
+        return nullptr;
+    }
+    delete detectStringsShader;
 
     // Single axion
     SimulationLayout simulationLayout = {
@@ -706,6 +831,9 @@ Simulation *Simulation::createSingleAxionSimulation()
         updateAccelerationPass,
         calculateLaplacianPass,
         calculatePhasePass,
+        true,
+        detectStringsPass,
+        true,
         simulationLayout);
 }
 
@@ -718,43 +846,49 @@ Simulation *Simulation::createCompanionAxionSimulation()
     {
         return nullptr;
     }
+    delete evolveFieldShader;
     Shader *evolveVelocityShader = new Shader("shaders/evolve_velocity.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *evolveVelocityPass = new ComputeShaderProgram(evolveVelocityShader);
     if (!evolveVelocityPass->isInitialised)
     {
         return nullptr;
     }
+    delete evolveVelocityShader;
     Shader *calculateAccelerationShader = new Shader("shaders/companion_axion.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateAccelerationPass = new ComputeShaderProgram(calculateAccelerationShader);
     if (!calculateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateAccelerationShader;
     Shader *updateAccelerationShader = new Shader("shaders/update_acceleration.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *updateAccelerationPass = new ComputeShaderProgram(updateAccelerationShader);
     if (!updateAccelerationPass->isInitialised)
     {
         return nullptr;
     }
+    delete updateAccelerationShader;
     Shader *calculateLaplacianShader = new Shader("shaders/calculate_laplacian.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculateLaplacianPass = new ComputeShaderProgram(calculateLaplacianShader);
     if (!calculateLaplacianPass->isInitialised)
     {
         return nullptr;
     }
+    delete calculateLaplacianShader;
     Shader *calculatePhaseShader = new Shader("shaders/calculate_phase.glsl", ShaderType::COMPUTE_SHADER);
     ComputeShaderProgram *calculatePhasePass = new ComputeShaderProgram(calculatePhaseShader);
     if (!calculatePhasePass->isInitialised)
     {
         return nullptr;
     }
-
-    delete evolveFieldShader;
-    delete evolveVelocityShader;
-    delete calculateAccelerationShader;
-    delete updateAccelerationShader;
-    delete calculateLaplacianShader;
     delete calculatePhaseShader;
+    Shader *detectStringsShader = new Shader("shaders/detect_strings.glsl", ShaderType::COMPUTE_SHADER);
+    ComputeShaderProgram *detectStringsPass = new ComputeShaderProgram(detectStringsShader);
+    if (!detectStringsPass->isInitialised)
+    {
+        return nullptr;
+    }
+    delete detectStringsShader;
 
     // Companion axion
     SimulationLayout simulationLayout = {
@@ -782,6 +916,9 @@ Simulation *Simulation::createCompanionAxionSimulation()
         updateAccelerationPass,
         calculateLaplacianPass,
         calculatePhasePass,
+        true,
+        detectStringsPass,
+        true,
         simulationLayout);
 }
 
@@ -807,6 +944,31 @@ void Simulation::calculatePhase()
     }
 }
 
+void Simulation::detectStrings()
+{
+    // Bind two textures at once and detect the strings
+    for (size_t stringIndex = 0; stringIndex < m_StringTextures.size(); stringIndex++)
+    {
+        m_DetectStringsPass->use();
+        // Real part
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, fields[(size_t)2 * stringIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        // Imaginary part
+        glActiveTexture(GL_TEXTURE1);
+        glBindImageTexture(1, fields[(size_t)2 * stringIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        // Output string texture
+        glActiveTexture(GL_TEXTURE2);
+        glBindImageTexture(2, m_StringTextures[stringIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+        // Dispatch and barrier
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        // Store the string count
+        m_StringNumbers.push_back(getStringNumber(stringIndex));
+    }
+}
+
 void Simulation::calculateAcceleration()
 {
     // Calculate the acceleration
@@ -828,7 +990,7 @@ void Simulation::calculateAcceleration()
     }
 
     // Bind phases if they exist
-    if (m_PhaseTextures.size() > 0)
+    if (m_RequiresPhase && m_PhaseTextures.size() > 0)
     {
         for (const auto &phaseTexture : m_PhaseTextures)
         {
@@ -871,4 +1033,51 @@ void Simulation::initialiseSimulation()
     // Update acceleration but not value or velocity
     calculateAcceleration();
     updateAcceleration();
+}
+
+int Simulation::getStringNumber(size_t stringIndex)
+{
+    // If index out of bounds return 0.
+    if (stringIndex >= m_StringTextures.size() || stringIndex < 0)
+    {
+        return 0;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, m_StringTextures[stringIndex].textureID);
+    int M, N;
+    int miplevel = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
+
+    std::vector<float> textureData(M * N);
+
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, static_cast<void *>(textureData.data()));
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    int stringNumber = 0;
+
+    for (int rowIndex = 0; rowIndex < M; rowIndex++)
+    {
+        for (int columnIndex = 0; columnIndex < N; columnIndex++)
+        {
+            size_t currentIndex = (rowIndex * N) + columnIndex;
+            float stringValue = textureData[currentIndex];
+            stringNumber += abs(int(stringValue));
+        }
+    }
+
+    return stringNumber;
+}
+
+int Simulation::getCurrentStringNumber()
+{
+    size_t stringIndex = floor(renderIndex / 2);
+    if (m_StringNumbers.size() > 0)
+    {
+        return m_StringNumbers.back();
+    }
+    else
+    {
+        return 0;
+    }
 }

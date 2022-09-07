@@ -63,11 +63,13 @@ private:
     // Rendering
     VertexFragmentShaderProgram *m_PlotFieldProgram;
     VertexFragmentShaderProgram *m_PlotPhaseProgram;
+    VertexFragmentShaderProgram *m_PlotStringsProgram;
     VertexArray *m_MainViewportVertexArray;
 
     Simulation *m_Simulation;
 
     Texture2D *m_colorMap;
+    Texture2D *m_discreteColorMap;
 
     int m_maxTimesteps = 1000;
 

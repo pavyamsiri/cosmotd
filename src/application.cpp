@@ -149,15 +149,26 @@ Application::Application(int width, int height, const char *title)
     {
         return;
     }
+    Shader *plotStringsShader = new Shader("shaders/plot_strings.glsl", ShaderType::FRAGMENT_SHADER);
+    if (!plotStringsShader->isInitialised)
+    {
+        return;
+    }
     // Create field shader program
     VertexFragmentShaderProgram *plotFieldProgram = new VertexFragmentShaderProgram(vertexShader, plotFieldShader);
     if (!plotFieldProgram->isInitialised)
     {
         return;
     }
-    // Create shader programs
+    // Create phase shader program
     VertexFragmentShaderProgram *plotPhaseProgram = new VertexFragmentShaderProgram(vertexShader, plotPhaseShader);
     if (!plotPhaseProgram->isInitialised)
+    {
+        return;
+    }
+    // Create strings shader program
+    VertexFragmentShaderProgram *plotStringsProgram = new VertexFragmentShaderProgram(vertexShader, plotStringsShader);
+    if (!plotStringsProgram->isInitialised)
     {
         return;
     }
@@ -165,10 +176,13 @@ Application::Application(int width, int height, const char *title)
     // Save shader programs
     this->m_PlotFieldProgram = plotFieldProgram;
     this->m_PlotPhaseProgram = plotPhaseProgram;
+    this->m_PlotStringsProgram = plotStringsProgram;
 
     // Delete shaders as they are no longer necessary
     delete vertexShader;
     delete plotFieldShader;
+    delete plotPhaseShader;
+    delete plotStringsShader;
 
     // Define vertex buffer layout
     VertexBufferLayout layout = {{BufferElementType::FLOAT2, false}, {BufferElementType::FLOAT2, true}};
@@ -190,8 +204,10 @@ Application::Application(int width, int height, const char *title)
     this->m_Simulation = Simulation::createDomainWallSimulation();
     // Set default field.
     m_Simulation->setField(Texture2D::loadFromCTDDFile("data/default/domain_walls_M200_N200_np20228.ctdd"));
-    // Set default colormap
+    // Set default continuous colormap
     m_colorMap = Texture2D::loadFromPNG("colormaps/twilight_shifted_colormap.png");
+    // Set default discrete colormap
+    m_discreteColorMap = Texture2D::loadFromPNG("colormaps/cosmic_string_highlight_colormap.png");
 
     // Initialise file dialog system
     NFD_Init();
@@ -316,6 +332,16 @@ void Application::onRender()
         m_colorMap->bind(0);
         m_Simulation->getCurrentLaplacian()->bind(1);
     }
+    // Plot the detected strings
+    else if (m_currentPlottingProcedureIndex == 4 && phaseAvailable)
+    {
+        m_PlotStringsProgram->use();
+        m_colorMap->bind(0);
+        m_discreteColorMap->bind(1);
+        m_Simulation->getCurrentRealTexture()->bind(2);
+        m_Simulation->getCurrentImagTexture()->bind(3);
+        m_Simulation->getCurrentStrings()->bind(4);
+    }
     // For undefined indices or if the phase is unavailable, just plot the phase
     else
     {
@@ -413,6 +439,9 @@ void Application::onImGuiRender()
 
         // Control the number of timesteps
         ImGui::InputInt("Max Timesteps", &m_maxTimesteps, 100, 1000);
+
+        // Number of strings
+        ImGui::Text("Number of strings %d", m_Simulation->getCurrentStringNumber());
     }
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
@@ -442,7 +471,7 @@ void Application::onImGuiRender()
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Save as"))
+        if (ImGui::Button("Save field as"))
         {
             nfdchar_t *outPath;
             nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
@@ -451,6 +480,50 @@ void Application::onImGuiRender()
             {
                 m_Simulation->saveFields(outPath);
                 logDebug("Saving field at path %s", outPath);
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling save file dialog...");
+            }
+            else
+            {
+                logError("Save file dialog error: %s", NFD_GetError());
+            }
+        }
+        if (ImGui::Button("Save phase as"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, nullptr);
+            if (result == NFD_OKAY)
+            {
+                m_Simulation->savePhases(outPath);
+                logDebug("Saving phases at path %s", outPath);
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling save file dialog...");
+            }
+            else
+            {
+                logError("Save file dialog error: %s", NFD_GetError());
+            }
+        }
+        if (ImGui::Button("Save string counts as"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"string count data files", "data"}};
+            nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, nullptr);
+            if (result == NFD_OKAY)
+            {
+                m_Simulation->saveStringNumbers(outPath);
+                logDebug("Saving string counts at path %s", outPath);
 
                 // Free file path after use
                 NFD_FreePath(outPath);
@@ -488,7 +561,7 @@ void Application::onImGuiRender()
             }
         }
 
-        const char *availablePlottingProcedures[] = {"Field", "Raw Phase", "Smooth Phase", "Laplacian"};
+        const char *availablePlottingProcedures[] = {"Field", "Raw Phase", "Smooth Phase", "Laplacian", "Strings"};
 
         if (ImGui::BeginCombo("Plotting", m_currentPlottingProcedure))
         {

@@ -5,7 +5,7 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
 layout(rgba32f, binding = 0) restrict uniform image2D fieldTexture;
 
 // Uniforms: time interval
-layout(location=0) uniform float dt;
+layout(location = 0) uniform float dt;
 
 // PRS alpha
 const float ALPHA_2D = 2.0f;

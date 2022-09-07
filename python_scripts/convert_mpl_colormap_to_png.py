@@ -5,9 +5,16 @@ from PIL import Image
 import numpy as np
 import struct
 
-ctdd_flag = True
+ctdd_flag = False
 
 if __name__ == "__main__":
+    # Add discrete color map for strings
+    cmaps["cosmic_string_highlight"] = [
+        [0.0, 0.0, 1.0],
+        [1.0, 1.0, 1.0],
+        [1.0, 0.0, 0.0],
+    ]
+
     for cmap_name in cmaps:
         cmap_data = cmaps[cmap_name]
         # Write as .ctdd
