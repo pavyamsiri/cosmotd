@@ -538,6 +538,19 @@ void Application::onImGuiRender()
             }
         }
 
+        // Random
+        static int fieldWidth = 200;
+        static int fieldHeight = 200;
+        static int seed = 0;
+        ImGui::SliderInt("Field width", &fieldWidth, 0, 1000);
+        ImGui::SliderInt("Field height", &fieldHeight, 0, 1000);
+        ImGui::InputInt("Seed", &seed);
+        if (ImGui::Button("Randomise Fields"))
+        {
+            m_Simulation->randomiseFields((uint32_t)fieldWidth, (uint32_t)fieldHeight, (uint32_t)seed);
+        }
+        ImGui::SameLine();
+
         // Change colormap
         if (ImGui::Button("Change colormap"))
         {

@@ -40,55 +40,6 @@ void Texture2D::release()
     logDebug("Deleted Texture2D with ID %d", textureID);
 }
 
-const void Texture2D::saveField(const char *filePath) const
-{
-    glBindTexture(GL_TEXTURE_2D, this->textureID);
-    int M, N;
-    int miplevel = 0;
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
-
-    std::vector<float> textureData(M * N * 4);
-
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(textureData.data()));
-    auto errorCode = glGetError();
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    std::ofstream dataFile;
-    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try
-    {
-        uint32_t numFields = 1;
-
-        dataFile.open(filePath, std::ios::binary);
-        // Write header
-        dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
-        dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
-        dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
-
-        // Read data
-        for (int rowIndex = 0; rowIndex < M; rowIndex++)
-        {
-            for (int columnIndex = 0; columnIndex < N; columnIndex++)
-            {
-                float fieldValue = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 0];
-                float fieldVelocity = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 1];
-                float fieldAcceleration = textureData[(rowIndex * 4 * N) + 4 * columnIndex + 2];
-                dataFile.write(reinterpret_cast<char *>(&fieldValue), sizeof(float));
-                dataFile.write(reinterpret_cast<char *>(&fieldVelocity), sizeof(float));
-                dataFile.write(reinterpret_cast<char *>(&fieldAcceleration), sizeof(float));
-            }
-        }
-
-        dataFile.close();
-        logTrace("Successfully wrote field data to binary file!");
-    }
-    catch (std::ifstream::failure &e)
-    {
-        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
-    }
-}
-
 // Texture data setters
 
 std::vector<std::shared_ptr<Texture2D>> Texture2D::loadFromCTDDFile(const char *filePath)

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <fstream>
 #include <cmath>
+#include <random>
 
 #include "simulation.h"
 
@@ -1080,4 +1081,58 @@ int Simulation::getCurrentStringNumber()
     {
         return 0;
     }
+}
+
+void Simulation::randomiseFields(uint32_t width, uint32_t height, uint32_t seed)
+{
+    std::default_random_engine seedGenerator;
+    seedGenerator.seed(seed);
+    std::uniform_int_distribution<uint32_t> seedDistribution(0, UINT32_MAX);
+
+    // Create new fields
+    std::vector<std::shared_ptr<Texture2D>> newFields(m_NumFields);
+
+    for (size_t fieldIndex = 0; fieldIndex < newFields.size(); fieldIndex++)
+    {
+        // Random generator
+        std::default_random_engine valueGenerator;
+        uint32_t currentSeed = seedDistribution(seedGenerator);
+        valueGenerator.seed(currentSeed);
+        std::normal_distribution<float> distribution(0.0f, 1.0f);
+
+        std::vector<float> textureData(height * width * 4);
+        for (int rowIndex = 0; rowIndex < height; rowIndex++)
+        {
+            for (int columnIndex = 0; columnIndex < width; columnIndex++)
+            {
+                // Red channel - field value
+                textureData[(rowIndex * 4 * width) + 4 * columnIndex + 0] = 0.1f * distribution(valueGenerator);
+                // Green channel - field velocity
+                textureData[(rowIndex * 4 * width) + 4 * columnIndex + 1] = 0.0f;
+                // Acceleration is initialised to zero. It needs to be initialised by the simulation itself, as the simulation
+                // parameters will affect the calculation.
+                // Blue channel - current field acceleration
+                textureData[(rowIndex * 4 * width) + 4 * columnIndex + 2] = 0.0f;
+                // Alpha channel - next field acceleration
+                textureData[(rowIndex * 4 * width) + 4 * columnIndex + 3] = 0.0f;
+            }
+        }
+
+        newFields[fieldIndex] = std::shared_ptr<Texture2D>(new Texture2D());
+        newFields[fieldIndex]->width = width;
+        newFields[fieldIndex]->height = height;
+
+        glBindTexture(GL_TEXTURE_2D, newFields[fieldIndex]->textureID);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, static_cast<void *>(textureData.data()));
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTextureStorage2D(newFields[fieldIndex]->textureID, 1, GL_RGBA32F, width, height);
+        glBindImageTexture(0, newFields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+        textureData.clear();
+    }
+
+    // Set the new fields
+    setField(newFields);
 }

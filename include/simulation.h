@@ -162,6 +162,7 @@ public:
     ~Simulation();
 
     void setField(std::vector<std::shared_ptr<Texture2D>> startFields);
+    void randomiseFields(uint32_t width, uint32_t height, uint32_t seed);
 
     void saveFields(const char *filePath);
     void savePhases(const char *filePath);
