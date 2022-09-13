@@ -47,6 +47,12 @@ const uint32_t indices[] = {
     3, 2, 0  // second triangle
 };
 
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+}
+
 // This is a callback that resizes the viewport upon framebuffer resize.
 void framebufferSizeCallback(GLFWwindow *window, int width, int height)
 {
@@ -679,10 +685,4 @@ void Application::onUpdate()
 void Application::onSimulationUpdate()
 {
     m_Simulation->update();
-}
-
-void processInput(GLFWwindow *window)
-{
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
 }

@@ -22,7 +22,6 @@ void main() {
     // Calculate next velocity
     float nextVelocity = currentVelocity + 0.5f * (currentAcceleration + nextAcceleration) * dt;
 
-    // NOTE: We don't update the acceleration in this shader, however it should always be updated after this shader is run.
     // Update velocity
     imageStore(fieldTexture, pos, vec4(nextValue, nextVelocity, currentAcceleration, nextAcceleration));
 }

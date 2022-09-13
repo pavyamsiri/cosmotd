@@ -7,13 +7,6 @@
 
 #include "simulation.h"
 
-// TODO: Delete this
-inline int modulo(int a, int b)
-{
-    const int result = a % b;
-    return result >= 0 ? result : result + b;
-}
-
 const char *convertUniformDataTypeToString(UniformDataType type)
 {
     switch (type)
@@ -34,9 +27,9 @@ const char *convertUniformDataTypeToString(UniformDataType type)
         return "INT3";
     case UniformDataType::INT4:
         return "INT4";
-    default:
-        return "UNKNOWN";
     }
+    logError("Unknown uniform data type!");
+    return "UNKNOWN";
 }
 
 Simulation::~Simulation()
@@ -126,8 +119,6 @@ void Simulation::update()
 
 void Simulation::bindUniforms()
 {
-    // NOTE: This is hardcoded to be 4 because currently the first four uniform locations are taken by the universal parameters.
-    // They might be packed together as one float4 though and so this value might need to change to 1.
     uint32_t currentLocation = 3;
 
     // Reset uniform indices
@@ -227,7 +218,7 @@ void Simulation::onUIRender()
 {
     if (ImGui::Checkbox("Running", &runFlag) && runFlag)
     {
-        // initialiseSimulation();
+        initialiseSimulation();
     }
 
     // Reset button
@@ -242,7 +233,6 @@ void Simulation::onUIRender()
         ImGui::SliderInt("Select fields", &renderIndex, 0, fields.size() - 1);
     }
 
-    // NOTE: These min and max values have been randomly selected. Might change these later.
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
     ImGui::SliderFloat("dt", &dt, 0.001f, 1.0f);
 
@@ -260,19 +250,19 @@ void Simulation::onUIRender()
             ImGui::SliderFloat(
                 element.name.c_str(),
                 &floatUniforms[floatUniformIndex],
-                element.minValue.floatMinValue,
-                element.maxValue.floatMaxValue);
+                element.minValue,
+                element.maxValue);
 
             floatUniformIndex++;
 
             break;
         case UniformDataType::FLOAT2:
-            // TODO: SliderFloat2 just takes a float pointer which might work and take the two floats but it might also not work.
+            // NOTE: SliderFloat2 just takes a float pointer which might work and take the two floats but it might also not work.
             ImGui::SliderFloat2(
                 element.name.c_str(),
                 &floatUniforms[floatUniformIndex],
-                element.minValue.floatMinValue,
-                element.maxValue.floatMaxValue);
+                element.minValue,
+                element.maxValue);
 
             floatUniformIndex = floatUniformIndex + 2;
 
@@ -281,8 +271,8 @@ void Simulation::onUIRender()
             ImGui::SliderFloat3(
                 element.name.c_str(),
                 &floatUniforms[floatUniformIndex],
-                element.minValue.floatMinValue,
-                element.maxValue.floatMaxValue);
+                element.minValue,
+                element.maxValue);
 
             floatUniformIndex = floatUniformIndex + 3;
 
@@ -291,8 +281,8 @@ void Simulation::onUIRender()
             ImGui::SliderFloat4(
                 element.name.c_str(),
                 &floatUniforms[floatUniformIndex],
-                element.minValue.floatMinValue,
-                element.maxValue.floatMaxValue);
+                element.minValue,
+                element.maxValue);
 
             floatUniformIndex = floatUniformIndex + 3;
 
@@ -301,8 +291,8 @@ void Simulation::onUIRender()
             ImGui::SliderInt(
                 element.name.c_str(),
                 &intUniforms[intUniformIndex],
-                (int)element.minValue.floatMinValue,
-                (int)element.maxValue.floatMaxValue);
+                (int)element.minValue,
+                (int)element.maxValue);
 
             intUniformIndex++;
 
@@ -311,8 +301,8 @@ void Simulation::onUIRender()
             ImGui::SliderInt2(
                 element.name.c_str(),
                 &intUniforms[intUniformIndex],
-                element.minValue.intMinValue,
-                element.maxValue.intMaxValue);
+                element.minValue,
+                element.maxValue);
 
             intUniformIndex = intUniformIndex + 2;
 
@@ -321,8 +311,8 @@ void Simulation::onUIRender()
             ImGui::SliderInt3(
                 element.name.c_str(),
                 &intUniforms[intUniformIndex],
-                element.minValue.intMinValue,
-                element.maxValue.intMaxValue);
+                element.minValue,
+                element.maxValue);
 
             intUniformIndex = intUniformIndex + 3;
 
@@ -331,8 +321,8 @@ void Simulation::onUIRender()
             ImGui::SliderInt4(
                 element.name.c_str(),
                 &intUniforms[intUniformIndex],
-                element.minValue.intMinValue,
-                element.maxValue.intMaxValue);
+                element.minValue,
+                element.maxValue);
 
             intUniformIndex = intUniformIndex + 4;
 
@@ -415,8 +405,6 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         glClearTexImage(m_LaplacianTextures[fieldIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
 
         // Resize phase texture sizes if necessary
-        // TODO: This might happen twice more than necessary, however if the resizing is successful on the first go then
-        // it probably is fine, as the second go would be properly sized.
         if (m_PhaseTextures.size() > 0)
         {
             size_t phaseIndex = floor(fieldIndex / 2);
@@ -459,7 +447,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         stringCount.clear();
     }
 
-    // initialiseSimulation();
+    initialiseSimulation();
 }
 
 void Simulation::saveFields(const char *filePath)
@@ -1147,7 +1135,10 @@ void Simulation::randomiseFields(uint32_t width, uint32_t height, uint32_t seed)
             }
         }
 
-        newFields[fieldIndex] = std::shared_ptr<Texture2D>(new Texture2D());
+        Texture2D *fieldTexture = new Texture2D();
+        fieldTexture->setTextureWrap(TextureWrapAxis::UV, TextureWrapMode::REPEAT);
+        fieldTexture->setTextureFilter(TextureFilterLevel::MIN_MAG, TextureFilterMode::LINEAR);
+        newFields[fieldIndex] = std::shared_ptr<Texture2D>(fieldTexture);
         newFields[fieldIndex]->width = width;
         newFields[fieldIndex]->height = height;
 

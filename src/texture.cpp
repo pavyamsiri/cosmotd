@@ -6,6 +6,32 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+GLenum convertTextureWrapModeToOpenGLEnum(TextureWrapMode mode)
+{
+    switch (mode)
+    {
+    case TextureWrapMode::REPEAT:
+        return GL_REPEAT;
+    case TextureWrapMode::CLAMP_TO_EDGE:
+        return GL_CLAMP_TO_EDGE;
+    }
+    logError("Invalid texture wrap mode!");
+    return 0;
+}
+
+GLenum convertTextureFilterModeToOpenGLEnum(TextureFilterMode mode)
+{
+    switch (mode)
+    {
+    case TextureFilterMode::NEAREST:
+        return GL_NEAREST;
+    case TextureFilterMode::LINEAR:
+        return GL_LINEAR;
+    }
+    logError("Invalid texture filter mode!");
+    return 0;
+}
+
 Texture2D::Texture2D()
 {
     logTrace("Creating a blank 2D texture...");
@@ -13,6 +39,8 @@ Texture2D::Texture2D()
     glGenTextures(1, &textureID);
     // Bind the texture
     glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Default parameters
     // Set texture wrapping parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -38,6 +66,52 @@ void Texture2D::release()
     glDeleteTextures(1, &textureID);
     // Log
     logDebug("Deleted Texture2D with ID %d", textureID);
+}
+
+void Texture2D::setTextureWrap(TextureWrapAxis axis, TextureWrapMode mode)
+{
+    GLenum wrapMode = convertTextureWrapModeToOpenGLEnum(mode);
+    // Bind the texture
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    switch (axis)
+    {
+    case TextureWrapAxis::U:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode);
+        break;
+    case TextureWrapAxis::V:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
+        break;
+    case TextureWrapAxis::UV:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapMode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapMode);
+        break;
+    }
+
+    // // Unbind
+    // glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Texture2D::setTextureFilter(TextureFilterLevel level, TextureFilterMode mode)
+{
+    GLenum filterMode = convertTextureFilterModeToOpenGLEnum(mode);
+
+    switch (level)
+    {
+    case TextureFilterLevel::MIN:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filterMode);
+        break;
+    case TextureFilterLevel::MAG:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filterMode);
+        break;
+    case TextureFilterLevel::MIN_MAG:
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filterMode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filterMode);
+        break;
+    }
+
+    // // Unbind
+    // glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 // Texture data setters
@@ -151,6 +225,7 @@ Texture2D *Texture2D::loadFromPNG(const char *filePath)
     unsigned char *data = stbi_load(filePath, &width, &height, &bpp, STBI_rgb);
     // Create new texture
     Texture2D *pngTexture = new Texture2D();
+    pngTexture->setTextureWrap(TextureWrapAxis::UV, TextureWrapMode::CLAMP_TO_EDGE);
 
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 

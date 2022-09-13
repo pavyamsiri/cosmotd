@@ -4,6 +4,34 @@
 #include <stdint.h>
 #include <vector>
 
+// The supported texture wrap modes.
+enum class TextureWrapMode
+{
+    REPEAT = 0,
+    CLAMP_TO_EDGE,
+};
+
+// The supported texture filter methods.
+enum class TextureFilterMode
+{
+    NEAREST = 0,
+    LINEAR,
+};
+
+enum class TextureWrapAxis
+{
+    U = 0,
+    V,
+    UV,
+};
+
+enum class TextureFilterLevel
+{
+    MIN = 0,
+    MAG,
+    MIN_MAG,
+};
+
 class Texture2D
 {
 public:
@@ -50,6 +78,10 @@ public:
 
     // Release texture
     void release();
+
+    // Change sampler wrapping
+    void setTextureWrap(TextureWrapAxis axis, TextureWrapMode mode);
+    void setTextureFilter(TextureFilterLevel level, TextureFilterMode mode);
 
     // Initialisers
     static std::vector<std::shared_ptr<Texture2D>> loadFromCTDDFile(const char *filePath);

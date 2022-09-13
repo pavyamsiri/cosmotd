@@ -31,10 +31,9 @@ GLenum convertBufferUsageTypeToOpenGLEnum(BufferUsageType type)
         return GL_DYNAMIC_READ;
     case BufferUsageType::DYNAMIC_COPY:
         return GL_DYNAMIC_COPY;
-    default:
-        logError("Invalid buffer usage type!");
-        return 0;
     }
+    logError("Invalid buffer usage type!");
+    return 0;
 }
 
 uint32_t getBufferElementTypeNumberOfRows(BufferElementType type)
@@ -79,10 +78,9 @@ uint32_t getBufferElementTypeNumberOfRows(BufferElementType type)
     case BufferElementType::DOUBLE_MAT2X4:
     case BufferElementType::DOUBLE_MAT3X4:
         return 4;
-    default:
-        logError("Invalid buffer element type!");
-        return 0;
     }
+    logError("Invalid buffer element type!");
+    return 0;
 }
 
 VertexBuffer::VertexBuffer(void *vertices, uint32_t size, BufferUsageType usageType, VertexBufferLayout layout) : layout(layout)

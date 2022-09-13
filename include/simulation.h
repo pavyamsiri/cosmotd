@@ -8,8 +8,7 @@
 
 enum class UniformDataType
 {
-    NONE = 0,
-    INT,
+    INT = 0,
     INT2,
     INT3,
     INT4,
@@ -39,24 +38,12 @@ public:
 
     // Initial value
 
-    union startValue
-    {
-        float floatStartValue;
-        int32_t intStartValue;
-    } startValue;
+    float startValue;
 
     // Min and max values
-    union minValue
-    {
-        float floatMinValue;
-        int32_t intMinValue;
-    } minValue;
+    float minValue;
 
-    union maxValue
-    {
-        float floatMaxValue;
-        int32_t intMaxValue;
-    } maxValue;
+    float maxValue;
 };
 
 struct SimulationLayout
@@ -115,43 +102,42 @@ public:
             switch (element.type)
             {
             case UniformDataType::FLOAT:
-                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue);
                 break;
             // TODO: Vectors might have different initial values. How do we encode that though?
             case UniformDataType::FLOAT2:
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
                 break;
             case UniformDataType::FLOAT3:
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
                 break;
             case UniformDataType::FLOAT4:
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
-                floatUniforms.push_back(element.startValue.floatStartValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
+                floatUniforms.push_back(element.startValue);
                 break;
             case UniformDataType::INT:
-                // TODO: For some reason, integer values always get interpreted as floats and so we need to cast into integer.
-                intUniforms.push_back((int)element.startValue.floatStartValue);
+                intUniforms.push_back((int)element.startValue);
                 break;
             // TODO: Vectors might have different initial values. How do we encode that though?
             case UniformDataType::INT2:
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
                 break;
             case UniformDataType::INT3:
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
                 break;
             case UniformDataType::INT4:
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
-                intUniforms.push_back(element.startValue.intStartValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
+                intUniforms.push_back((int)element.startValue);
                 break;
             default:
                 logWarning(
@@ -169,8 +155,6 @@ public:
 
     void saveFields(const char *filePath);
     void savePhases(const char *filePath);
-    // TODO: WARNING this currently ignores the fact that for four fields and above, the string numbers vector will take both
-    // string counts into a single flat vector. Hence this does not work properly for more than two fields.
     void saveStringNumbers(const char *filePath);
 
     void runRandomTrials(uint32_t numTrials);

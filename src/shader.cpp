@@ -6,19 +6,19 @@
 #include <log.h>
 #include <glad/glad.h>
 
-std::optional<int> convertShaderTypeToGLShaderType(ShaderType type)
+GLenum convertShaderTypeToGLShaderType(ShaderType type)
 {
     switch (type)
     {
     case ShaderType::VERTEX_SHADER:
-        return std::make_optional(GL_VERTEX_SHADER);
+        return GL_VERTEX_SHADER;
     case ShaderType::FRAGMENT_SHADER:
-        return std::make_optional(GL_FRAGMENT_SHADER);
+        return GL_FRAGMENT_SHADER;
     case ShaderType::COMPUTE_SHADER:
-        return std::make_optional(GL_COMPUTE_SHADER);
-    default:
-        return std::nullopt;
+        return GL_COMPUTE_SHADER;
     }
+    logError("Invalid shader type!");
+    return 0;
 }
 
 const char *convertShaderTypeToString(ShaderType type)
@@ -31,9 +31,9 @@ const char *convertShaderTypeToString(ShaderType type)
         return "FRAGMENT_SHADER";
     case ShaderType::COMPUTE_SHADER:
         return "COMPUTE_SHADER";
-    default:
-        return "UNKNOWN_SHADER";
     }
+    logError("Invalid shader type!");
+    return "UNKNOWN_SHADER";
 }
 
 int validateShaderCompilation(uint32_t shaderID)
@@ -83,7 +83,7 @@ Shader::Shader(const char *shaderPath, ShaderType type) : type(type)
     int glShaderType;
     try
     {
-        glShaderType = convertShaderTypeToGLShaderType(type).value();
+        glShaderType = convertShaderTypeToGLShaderType(type);
     }
     catch (const std::bad_optional_access &e)
     {

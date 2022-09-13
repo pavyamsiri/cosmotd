@@ -9,15 +9,12 @@
 #include <imgui_impl_opengl3.h>
 
 // Internal libraries
-#include <log.h>
-#include <shader_program.h>
-#include <buffer.h>
-#include <framebuffer.h>
-#include <texture.h>
+#include "buffer.h"
+#include "framebuffer.h"
+#include "log.h"
+#include "shader_program.h"
 #include "simulation.h"
-
-void framebufferSizeCallback(GLFWwindow *window, int width, int height);
-void processInput(GLFWwindow *window);
+#include "texture.h"
 
 class Application
 {
