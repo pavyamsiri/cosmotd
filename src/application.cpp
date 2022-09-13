@@ -65,7 +65,7 @@ void GLAPIENTRY messageCallback(
 {
     if (type == GL_DEBUG_TYPE_ERROR)
     {
-        logError("OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s", type, severity, message);
+        // logError("OpenGL: TYPE - 0x%x, SEVERITY - 0x%x, MESSAGE - %s", type, severity, message);
     }
     // Only log debug information that is severe enough
     else if (severity != 0x826b)
@@ -438,10 +438,16 @@ void Application::onImGuiRender()
         ImGui::Text("Simulation timestep %d", m_Simulation->getCurrentSimulationTimestep());
 
         // Control the number of timesteps
-        ImGui::InputInt("Max Timesteps", &m_maxTimesteps, 100, 1000);
+        ImGui::InputInt("Max Timesteps", &m_Simulation->maxTimesteps, 100, 1000);
 
         // Number of strings
         ImGui::Text("Number of strings %d", m_Simulation->getCurrentStringNumber());
+
+        // if (m_Simulation->getCurrentStringNumber() > 40000 && m_Simulation->getCurrentSimulationTimestep() > 100)
+        // {
+        //     logInfo("I got massive!");
+        //     m_Simulation->runFlag = false;
+        // }
     }
     ImGui::End();
     if (ImGui::Begin("Right hand Window"))
@@ -539,8 +545,8 @@ void Application::onImGuiRender()
         }
 
         // Random
-        static int fieldWidth = 200;
-        static int fieldHeight = 200;
+        static int fieldWidth = 256;
+        static int fieldHeight = 256;
         static int seed = 0;
         ImGui::SliderInt("Field width", &fieldWidth, 0, 1000);
         ImGui::SliderInt("Field height", &fieldHeight, 0, 1000);
@@ -572,6 +578,11 @@ void Application::onImGuiRender()
             {
                 logError("Open file dialog error: %s", NFD_GetError());
             }
+        }
+
+        if (ImGui::Button("Run trials"))
+        {
+            m_Simulation->runRandomTrials(100);
         }
 
         const char *availablePlottingProcedures[] = {"Field", "Raw Phase", "Smooth Phase", "Laplacian", "Strings"};
@@ -667,11 +678,6 @@ void Application::onUpdate()
 }
 void Application::onSimulationUpdate()
 {
-    if (m_Simulation->getCurrentSimulationTimestep() >= m_maxTimesteps)
-    {
-        m_Simulation->runFlag = false;
-    }
-
     m_Simulation->update();
 }
 

@@ -54,6 +54,11 @@ Simulation::~Simulation()
 
 void Simulation::update()
 {
+    if (timestep > maxTimesteps)
+    {
+        runFlag = false;
+    }
+
     if (!runFlag)
     {
         return;
@@ -72,9 +77,6 @@ void Simulation::update()
         glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        // Update time
-        timestep += 1;
-
         // Calculate Laplacian
         m_CalculateLaplacianPass->use();
         glUniform1f(0, dx);
@@ -87,6 +89,9 @@ void Simulation::update()
         glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
+
+    // Update time
+    timestep += 1;
 
     // Calculate phase if there is more than one field
     if (fields.size() > 1 && m_PhaseTextures.size() > 0)
@@ -356,6 +361,11 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     logTrace("The size of the phase vector is %d", m_PhaseTextures.size());
     logTrace("The size of the Laplacian vector is %d", m_LaplacianTextures.size());
     logTrace("The size of the string vector is %d", m_StringTextures.size());
+    logTrace("The size of the string numbers vector is %d", m_StringNumbers.size());
+    if (m_StringNumbers.size() > 0)
+    {
+        logTrace("The size of the string numbers vector (count vector) is %d", m_StringNumbers[0].size());
+    }
 
     // Reset timestep
     timestep = 1;
@@ -441,6 +451,12 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
             // Clear the phase texture
             glClearTexImage(m_StringTextures[stringIndex].textureID, 0, GL_RGBA, GL_UNSIGNED_BYTE, &clearColor);
         }
+    }
+
+    // Clear the string count
+    for (auto &stringCount : m_StringNumbers)
+    {
+        stringCount.clear();
     }
 
     // initialiseSimulation();
@@ -550,22 +566,34 @@ void Simulation::savePhases(const char *filePath)
 
 void Simulation::saveStringNumbers(const char *filePath)
 {
+    // Need a non-zero size list
+    if (m_StringNumbers.size() == 0)
+    {
+        return;
+    }
+
     std::ofstream dataFile;
     dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     try
     {
-        uint32_t numTimesteps = m_StringNumbers.size();
-
+        // Open file
         dataFile.open(filePath, std::ios::binary);
-        // Write header
+        // Number of string fields
+        uint32_t numStringFields = m_StringNumbers.size();
+        dataFile.write(reinterpret_cast<char *>(&numStringFields), sizeof(uint32_t));
+        // Write the number of timesteps. This should be the same across both
+        uint32_t numTimesteps = m_StringNumbers[0].size();
         dataFile.write(reinterpret_cast<char *>(&numTimesteps), sizeof(uint32_t));
 
-        // Read data
-        for (int stringCount : m_StringNumbers)
+        for (size_t fieldIndex = 0; fieldIndex < m_StringNumbers.size(); fieldIndex++)
         {
-            dataFile.write(reinterpret_cast<char *>(&stringCount), sizeof(int));
-            logInfo("String count = %d", stringCount);
+            // Read data
+            for (int stringCount : m_StringNumbers[fieldIndex])
+            {
+                dataFile.write(reinterpret_cast<char *>(&stringCount), sizeof(int));
+            }
         }
+        // Structure is: Number of string fields = n -> Number of timesteps (n of these) = m -> String counts (m of these)
 
         dataFile.close();
         logTrace("Successfully wrote string count data to binary file!");
@@ -587,11 +615,12 @@ Texture2D *Simulation::getCurrentRenderTexture()
 }
 Texture2D *Simulation::getCurrentRealTexture()
 {
-    return &fields[floor(renderIndex / 2)];
+    size_t realIndex = 2 * floor(renderIndex / 2);
+    return &fields[realIndex];
 }
 Texture2D *Simulation::getCurrentImagTexture()
 {
-    size_t imagIndex = (((int)floor(renderIndex / 2) + 1)) % fields.size();
+    size_t imagIndex = ((int)(2 * floor(renderIndex / 2) + 1)) % fields.size();
     return &fields[imagIndex];
 }
 
@@ -966,7 +995,7 @@ void Simulation::detectStrings()
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         // Store the string count
-        m_StringNumbers.push_back(getStringNumber(stringIndex));
+        m_StringNumbers[stringIndex].push_back(getStringNumber(stringIndex));
     }
 }
 
@@ -1073,9 +1102,9 @@ int Simulation::getStringNumber(size_t stringIndex)
 int Simulation::getCurrentStringNumber()
 {
     size_t stringIndex = floor(renderIndex / 2);
-    if (m_StringNumbers.size() > 0)
+    if (m_StringNumbers.size() > 0 && m_StringNumbers[0].size() > 0)
     {
-        return m_StringNumbers.back();
+        return m_StringNumbers[0].back();
     }
     else
     {
@@ -1135,4 +1164,25 @@ void Simulation::randomiseFields(uint32_t width, uint32_t height, uint32_t seed)
 
     // Set the new fields
     setField(newFields);
+}
+
+void Simulation::runRandomTrials(uint32_t numTrials)
+{
+    for (size_t trialIndex = 0; trialIndex < numTrials; trialIndex++)
+    {
+        randomiseFields(256, 256, trialIndex);
+        logInfo("Beginning trial %d", trialIndex);
+        runFlag = true;
+
+        for (size_t timestepIndex = 0; timestepIndex < maxTimesteps; timestepIndex++)
+        {
+            update();
+        }
+
+        std::stringstream nameStream;
+        nameStream << "data/string_count_trial" << trialIndex << ".data";
+
+        saveStringNumbers(nameStream.str().c_str());
+    }
+    logInfo("Trials are complete!");
 }

@@ -73,6 +73,7 @@ class Simulation
 public:
     // Run flag
     bool runFlag = false;
+    int maxTimesteps = 1000;
     std::vector<std::shared_ptr<Texture2D>> originalFields;
     std::vector<Texture2D> fields;
 
@@ -103,8 +104,10 @@ public:
         // Resize vectors to the correct number of fields
         fields.resize(m_NumFields);
         m_LaplacianTextures.resize(m_NumFields);
-        m_PhaseTextures.resize(floor(m_NumFields / 2));
-        m_StringTextures.resize(floor(m_NumFields / 2));
+        size_t numPhases = floor(m_NumFields / 2);
+        m_PhaseTextures.resize(numPhases);
+        m_StringTextures.resize(numPhases);
+        m_StringNumbers.resize(numPhases);
 
         // Create uniform values
         for (const auto &element : layout.elements)
@@ -170,6 +173,8 @@ public:
     // string counts into a single flat vector. Hence this does not work properly for more than two fields.
     void saveStringNumbers(const char *filePath);
 
+    void runRandomTrials(uint32_t numTrials);
+
     void update();
 
     void bindUniforms();
@@ -209,7 +214,7 @@ private:
     std::vector<Texture2D> m_PhaseTextures;
     std::vector<Texture2D> m_StringTextures;
     // Number of strings
-    std::vector<int> m_StringNumbers;
+    std::vector<std::vector<int>> m_StringNumbers;
 
     // Calculate and update field
     ComputeShaderProgram *m_EvolveFieldPass;

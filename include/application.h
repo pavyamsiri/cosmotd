@@ -71,8 +71,6 @@ private:
     Texture2D *m_colorMap;
     Texture2D *m_discreteColorMap;
 
-    int m_maxTimesteps = 1000;
-
     const char *m_currentPlottingProcedure = "Smooth Phase";
     size_t m_currentPlottingProcedureIndex = 2;
 
