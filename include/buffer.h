@@ -1,12 +1,14 @@
 #pragma once
-
+// Standard libraries
 #include <intrin.h>
-
-// #include <stdint.h>
 #include <vector>
 
-#include <log.h>
+// External libraries
 
+// Internal libraries
+#include "log.h"
+
+// The allowed data types for a buffer element.
 enum class BufferElementType
 {
     NONE = 0,
@@ -46,6 +48,7 @@ enum class BufferElementType
     DOUBLE_MAT4X3,
 };
 
+// Helper function that returns the size of each buffer element data type in bytes.
 static uint32_t getBufferElementTypeByteSize(BufferElementType type)
 {
     switch (type)
@@ -124,101 +127,119 @@ static uint32_t getBufferElementTypeByteSize(BufferElementType type)
     }
 }
 
-uint32_t getBufferElementTypeNumberOfRows(BufferElementType type);
+// Helper function that returns the number of components for the given buffer element data type.
+static uint32_t getBufferElementTypeNumComponents(BufferElementType type)
+{
+    switch (type)
+    {
+    case BufferElementType::FLOAT:
+    case BufferElementType::DOUBLE:
+    case BufferElementType::INT:
+    case BufferElementType::UINT:
+        return 1;
+        break;
+    case BufferElementType::FLOAT2:
+    case BufferElementType::DOUBLE2:
+    case BufferElementType::INT2:
+    case BufferElementType::UINT2:
+        return 2;
+        break;
+    case BufferElementType::FLOAT3:
+    case BufferElementType::DOUBLE3:
+    case BufferElementType::INT3:
+    case BufferElementType::UINT3:
+        return 3;
+        break;
+    case BufferElementType::FLOAT4:
+    case BufferElementType::DOUBLE4:
+    case BufferElementType::INT4:
+    case BufferElementType::UINT4:
+        return 4;
+        break;
+    // Matrices only store their number of columns
+    case BufferElementType::FLOAT_MAT2:
+    case BufferElementType::FLOAT_MAT2X3:
+    case BufferElementType::FLOAT_MAT2X4:
+    case BufferElementType::DOUBLE_MAT2:
+    case BufferElementType::DOUBLE_MAT2X3:
+    case BufferElementType::DOUBLE_MAT2X4:
+        return 2;
+        break;
+    case BufferElementType::FLOAT_MAT3:
+    case BufferElementType::FLOAT_MAT3X2:
+    case BufferElementType::FLOAT_MAT3X4:
+    case BufferElementType::DOUBLE_MAT3:
+    case BufferElementType::DOUBLE_MAT3X2:
+    case BufferElementType::DOUBLE_MAT3X4:
+        return 3;
+        break;
+    case BufferElementType::FLOAT_MAT4:
+    case BufferElementType::FLOAT_MAT4X2:
+    case BufferElementType::FLOAT_MAT4X3:
+    case BufferElementType::DOUBLE_MAT4:
+    case BufferElementType::DOUBLE_MAT4X2:
+    case BufferElementType::DOUBLE_MAT4X3:
+        return 4;
+    default:
+        logError("Invalid buffer element type!");
+        return 0;
+    }
+}
 
+// Specifies an element in a buffer
 struct BufferElement
 {
 public:
+    // Data type of the buffer.
     BufferElementType type;
+    // Number of components per element, i.e. INT3 will have 3 components.
     uint32_t numComponents;
+    // Size of an element in bytes.
     uint32_t sizeInBytes;
+    // Only relevant for float/double data types. If true, each component will be normalised to be in the range [0, 1].
     bool normalized;
 
+    // Constructor
     BufferElement(BufferElementType type, bool normalized)
-        : type(type), sizeInBytes(getBufferElementTypeByteSize(type)), normalized(normalized)
+        : type(type), numComponents(getBufferElementTypeNumComponents(type)),
+          sizeInBytes(getBufferElementTypeByteSize(type)), normalized(normalized)
     {
-        switch (type)
-        {
-        case BufferElementType::FLOAT:
-        case BufferElementType::DOUBLE:
-        case BufferElementType::INT:
-        case BufferElementType::UINT:
-            numComponents = 1;
-            break;
-        case BufferElementType::FLOAT2:
-        case BufferElementType::DOUBLE2:
-        case BufferElementType::INT2:
-        case BufferElementType::UINT2:
-            numComponents = 2;
-            break;
-        case BufferElementType::FLOAT3:
-        case BufferElementType::DOUBLE3:
-        case BufferElementType::INT3:
-        case BufferElementType::UINT3:
-            numComponents = 3;
-            break;
-        case BufferElementType::FLOAT4:
-        case BufferElementType::DOUBLE4:
-        case BufferElementType::INT4:
-        case BufferElementType::UINT4:
-            numComponents = 4;
-            break;
-        // Matrices only store their number of columns
-        case BufferElementType::FLOAT_MAT2:
-        case BufferElementType::FLOAT_MAT2X3:
-        case BufferElementType::FLOAT_MAT2X4:
-        case BufferElementType::DOUBLE_MAT2:
-        case BufferElementType::DOUBLE_MAT2X3:
-        case BufferElementType::DOUBLE_MAT2X4:
-            numComponents = 2;
-            break;
-        case BufferElementType::FLOAT_MAT3:
-        case BufferElementType::FLOAT_MAT3X2:
-        case BufferElementType::FLOAT_MAT3X4:
-        case BufferElementType::DOUBLE_MAT3:
-        case BufferElementType::DOUBLE_MAT3X2:
-        case BufferElementType::DOUBLE_MAT3X4:
-            numComponents = 3;
-            break;
-        case BufferElementType::FLOAT_MAT4:
-        case BufferElementType::FLOAT_MAT4X2:
-        case BufferElementType::FLOAT_MAT4X3:
-        case BufferElementType::DOUBLE_MAT4:
-        case BufferElementType::DOUBLE_MAT4X2:
-        case BufferElementType::DOUBLE_MAT4X3:
-            numComponents = 4;
-        default:
-            logError("Invalid buffer element type!");
-            break;
-        }
     }
 };
 
+// Specifies the layout of a vertex buffer
 struct VertexBufferLayout
 {
 public:
-    VertexBufferLayout(const std::initializer_list<BufferElement> &elements) : m_elements(elements)
+    // Constructor that takes in a list of buffer elements and calculates the stride.
+    VertexBufferLayout(const std::initializer_list<BufferElement> &elements) : m_Elements(elements)
     {
         calculateStride();
     }
 
-    inline const std::vector<BufferElement> &getElements() const { return m_elements; };
-    inline const uint32_t getStride() const { return m_stride; };
+    // Getter method that returns the vector of buffer elements
+    inline const std::vector<BufferElement> &getElements() const { return m_Elements; };
+    // Getter method that returns the stride
+    inline const uint32_t getStride() const { return m_Stride; };
 
 private:
-    std::vector<BufferElement> m_elements;
-    uint32_t m_stride;
+    // List of buffer elements associated with the vertex buffer.
+    std::vector<BufferElement> m_Elements;
+    // The tatal size of the vertex buffer in bytes.
+    uint32_t m_Stride;
 
+    // Calculates the stride from the list of buffer elements associated with the vertex buffer.
     void calculateStride()
     {
-        m_stride = 0;
-        for (auto &element : m_elements)
+        m_Stride = 0;
+        for (auto &element : m_Elements)
         {
-            m_stride += element.sizeInBytes;
+            m_Stride += element.sizeInBytes;
         }
     }
 };
 
+// The usage types of a buffer.
 enum class BufferUsageType
 {
     STREAM_DRAW,
@@ -232,51 +253,67 @@ enum class BufferUsageType
     DYNAMIC_COPY,
 };
 
-class VertexBufferSpec
-{
-public:
-    BufferUsageType usage;
-};
-
+// Wraps a OpenGL vertex buffer.
 class VertexBuffer
 {
 public:
-    uint32_t bufferID;
+    //  OpenGL buffer ID
+    uint32_t bufferID = 0;
+    //  Data layout of the vertex buffer.
     VertexBufferLayout layout;
 
+    // Constructor that takes in vertex data
     VertexBuffer(void *vertices, uint32_t size, BufferUsageType usageType, VertexBufferLayout layout);
+    // Destructor
     ~VertexBuffer();
 
-    void bind() const;
-    void unbind() const;
+    // Binds the vertex buffer
+    void bind();
+    // Unbinds the vertex buffer
+    void unbind();
 };
 
+// Wraps a OpenGL index buffer.
 class IndexBuffer
 {
 public:
-    uint32_t bufferID;
+    // OpenGL buffer ID
+    uint32_t bufferID = 0;
 
+    // Constructor that takes in a list of indices
     IndexBuffer(const uint32_t *indices, uint32_t count, BufferUsageType usageType);
+    // Destructor
     ~IndexBuffer();
 
-    void bind() const;
-    void unbind() const;
+    // Binds the index buffer
+    void bind();
+    // Unbinds the index buffer
+    void unbind();
 };
 
+// Wraps a OpenGL VAO
 class VertexArray
 {
 public:
-    uint32_t arrayID;
+    // OpenGL vertex array object ID
+    uint32_t arrayID = 0;
 
+    // Constructor
     VertexArray();
+    // Destructor
     ~VertexArray();
 
+    // Bind vertex buffer to VAO
     void bindVertexBuffer(VertexBuffer *vertexBuffer);
+    // Bind index buffer to VAO
     void bindIndexBuffer(IndexBuffer *indexBuffer);
 
-    void bind() const;
-    void unbind() const;
+    // Bind the VAO
+    void bind();
+    // Unbind the VAO
+    void unbind();
 
 private:
-    uint32_t m_vertexBufferIndex = 0;
+    // Index that tracks the current vertex buffer index
+    uint32_t m_VertexBufferIndex = 0;
 };

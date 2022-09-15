@@ -7,31 +7,6 @@
 
 #include "simulation.h"
 
-const char *convertUniformDataTypeToString(UniformDataType type)
-{
-    switch (type)
-    {
-    case UniformDataType::FLOAT:
-        return "FLOAT";
-    case UniformDataType::FLOAT2:
-        return "FLOAT2";
-    case UniformDataType::FLOAT3:
-        return "FLOAT3";
-    case UniformDataType::FLOAT4:
-        return "FLOAT4";
-    case UniformDataType::INT:
-        return "INT";
-    case UniformDataType::INT2:
-        return "INT2";
-    case UniformDataType::INT3:
-        return "INT3";
-    case UniformDataType::INT4:
-        return "INT4";
-    }
-    logError("Unknown uniform data type!");
-    return "UNKNOWN";
-}
-
 Simulation::~Simulation()
 {
     delete m_EvolveFieldPass;
@@ -47,7 +22,7 @@ Simulation::~Simulation()
 
 void Simulation::update()
 {
-    if (timestep > maxTimesteps)
+    if (m_CurrentTimestep > maxTimesteps)
     {
         runFlag = false;
     }
@@ -58,14 +33,14 @@ void Simulation::update()
     }
 
     // Evolve field and time for all fields first
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
         // Calculate and update field
         m_EvolveFieldPass->use();
         glUniform1f(0, dt);
         // Bind read image
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
         glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -75,7 +50,7 @@ void Simulation::update()
         glUniform1f(0, dx);
         // Bind images
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         glActiveTexture(GL_TEXTURE1);
         glBindImageTexture(1, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
         // Dispatch and barrier
@@ -84,15 +59,15 @@ void Simulation::update()
     }
 
     // Update time
-    timestep += 1;
+    m_CurrentTimestep += 1;
 
     // Calculate phase if there is more than one field
-    if (fields.size() > 1 && m_PhaseTextures.size() > 0)
+    if (m_Fields.size() > 1 && m_PhaseTextures.size() > 0)
     {
         calculatePhase();
     }
     // Detect strings if requested
-    if (m_HasStrings && fields.size() > 1 && m_StringTextures.size() > 0)
+    if (m_HasStrings && m_Fields.size() > 1 && m_StringTextures.size() > 0)
     {
         detectStrings();
     }
@@ -101,14 +76,14 @@ void Simulation::update()
     calculateAcceleration();
 
     // Update velocity
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
         // Calculate and update the velocity
         m_EvolveVelocityPass->use();
         glUniform1f(0, dt);
         // Bind field
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
         glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -126,19 +101,19 @@ void Simulation::bindUniforms()
     uint32_t intUniformIndex = 0;
 
     // Iterate through layout and bind uniforms accordingly
-    for (const auto &element : layout.elements)
+    for (const auto &element : m_Layout.m_Elements)
     {
         switch (element.type)
         {
         case UniformDataType::FLOAT:
-            glUniform1f(currentLocation, floatUniforms[floatUniformIndex]);
+            glUniform1f(currentLocation, m_FloatUniforms[floatUniformIndex]);
             // Iterate to next float uniform value
             floatUniformIndex++;
             // Go to next uniform location
             currentLocation++;
             break;
         case UniformDataType::FLOAT2:
-            glUniform2f(currentLocation, floatUniforms[floatUniformIndex], floatUniforms[floatUniformIndex + 1]);
+            glUniform2f(currentLocation, m_FloatUniforms[floatUniformIndex], m_FloatUniforms[floatUniformIndex + 1]);
             // Skip ahead two float values
             floatUniformIndex = floatUniformIndex + 2;
             // Go to next uniform location
@@ -147,9 +122,9 @@ void Simulation::bindUniforms()
         case UniformDataType::FLOAT3:
             glUniform3f(
                 currentLocation,
-                floatUniforms[floatUniformIndex],
-                floatUniforms[floatUniformIndex + 1],
-                floatUniforms[floatUniformIndex + 2]);
+                m_FloatUniforms[floatUniformIndex],
+                m_FloatUniforms[floatUniformIndex + 1],
+                m_FloatUniforms[floatUniformIndex + 2]);
             // Skip ahead three float values
             floatUniformIndex = floatUniformIndex + 3;
             // Go to next uniform location
@@ -158,24 +133,24 @@ void Simulation::bindUniforms()
         case UniformDataType::FLOAT4:
             glUniform4f(
                 currentLocation,
-                floatUniforms[floatUniformIndex],
-                floatUniforms[floatUniformIndex + 1],
-                floatUniforms[floatUniformIndex + 2],
-                floatUniforms[floatUniformIndex + 3]);
+                m_FloatUniforms[floatUniformIndex],
+                m_FloatUniforms[floatUniformIndex + 1],
+                m_FloatUniforms[floatUniformIndex + 2],
+                m_FloatUniforms[floatUniformIndex + 3]);
             // Skip ahead four float values
             floatUniformIndex = floatUniformIndex + 4;
             // Go to next uniform location
             currentLocation++;
             break;
         case UniformDataType::INT:
-            glUniform1i(currentLocation, intUniforms[intUniformIndex]);
+            glUniform1i(currentLocation, m_IntUniforms[intUniformIndex]);
             // Iterate to next integer uniform value
             intUniformIndex++;
             // Go to next uniform location
             currentLocation++;
             break;
         case UniformDataType::INT2:
-            glUniform2i(currentLocation, intUniforms[intUniformIndex], intUniforms[intUniformIndex + 1]);
+            glUniform2i(currentLocation, m_IntUniforms[intUniformIndex], m_IntUniforms[intUniformIndex + 1]);
             // Skip ahead two integer values
             intUniformIndex = intUniformIndex + 2;
             // Go to next uniform location
@@ -184,9 +159,9 @@ void Simulation::bindUniforms()
         case UniformDataType::INT3:
             glUniform3i(
                 currentLocation,
-                intUniforms[intUniformIndex],
-                intUniforms[intUniformIndex + 1],
-                intUniforms[intUniformIndex + 2]);
+                m_IntUniforms[intUniformIndex],
+                m_IntUniforms[intUniformIndex + 1],
+                m_IntUniforms[intUniformIndex + 2]);
             // Skip ahead three integer values
             intUniformIndex = intUniformIndex + 3;
             // Go to next uniform location
@@ -195,10 +170,10 @@ void Simulation::bindUniforms()
         case UniformDataType::INT4:
             glUniform4i(
                 currentLocation,
-                intUniforms[intUniformIndex],
-                intUniforms[intUniformIndex + 1],
-                intUniforms[intUniformIndex + 2],
-                intUniforms[intUniformIndex + 3]);
+                m_IntUniforms[intUniformIndex],
+                m_IntUniforms[intUniformIndex + 1],
+                m_IntUniforms[intUniformIndex + 2],
+                m_IntUniforms[intUniformIndex + 3]);
             // Skip ahead four integer values
             intUniformIndex = intUniformIndex + 4;
             // Go to next uniform location
@@ -207,7 +182,7 @@ void Simulation::bindUniforms()
         default:
             logWarning(
                 "The given uniform data type %s for the uniform named %s is invalid!",
-                convertUniformDataTypeToString(element.type),
+                convertUniformDataTypeToString(element.type).c_str(),
                 element.name.c_str());
             break;
         }
@@ -224,13 +199,13 @@ void Simulation::onUIRender()
     // Reset button
     if (ImGui::Button("Reset field"))
     {
-        setField(originalFields);
+        setField(m_FieldSnapshot);
     }
 
     // Toggle field to display if there is more than one field
-    if (fields.size() > 1)
+    if (m_Fields.size() > 1)
     {
-        ImGui::SliderInt("Select fields", &renderIndex, 0, fields.size() - 1);
+        ImGui::SliderInt("Select fields", &m_RenderIndex, 0, m_Fields.size() - 1);
     }
 
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
@@ -242,14 +217,14 @@ void Simulation::onUIRender()
     uint32_t floatUniformIndex = 0;
     uint32_t intUniformIndex = 0;
 
-    for (const auto &element : layout.elements)
+    for (const auto &element : m_Layout.m_Elements)
     {
         switch (element.type)
         {
         case UniformDataType::FLOAT:
             ImGui::SliderFloat(
                 element.name.c_str(),
-                &floatUniforms[floatUniformIndex],
+                &m_FloatUniforms[floatUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -260,7 +235,7 @@ void Simulation::onUIRender()
             // NOTE: SliderFloat2 just takes a float pointer which might work and take the two floats but it might also not work.
             ImGui::SliderFloat2(
                 element.name.c_str(),
-                &floatUniforms[floatUniformIndex],
+                &m_FloatUniforms[floatUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -270,7 +245,7 @@ void Simulation::onUIRender()
         case UniformDataType::FLOAT3:
             ImGui::SliderFloat3(
                 element.name.c_str(),
-                &floatUniforms[floatUniformIndex],
+                &m_FloatUniforms[floatUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -280,7 +255,7 @@ void Simulation::onUIRender()
         case UniformDataType::FLOAT4:
             ImGui::SliderFloat4(
                 element.name.c_str(),
-                &floatUniforms[floatUniformIndex],
+                &m_FloatUniforms[floatUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -290,7 +265,7 @@ void Simulation::onUIRender()
         case UniformDataType::INT:
             ImGui::SliderInt(
                 element.name.c_str(),
-                &intUniforms[intUniformIndex],
+                &m_IntUniforms[intUniformIndex],
                 (int)element.minValue,
                 (int)element.maxValue);
 
@@ -300,7 +275,7 @@ void Simulation::onUIRender()
         case UniformDataType::INT2:
             ImGui::SliderInt2(
                 element.name.c_str(),
-                &intUniforms[intUniformIndex],
+                &m_IntUniforms[intUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -310,7 +285,7 @@ void Simulation::onUIRender()
         case UniformDataType::INT3:
             ImGui::SliderInt3(
                 element.name.c_str(),
-                &intUniforms[intUniformIndex],
+                &m_IntUniforms[intUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -320,7 +295,7 @@ void Simulation::onUIRender()
         case UniformDataType::INT4:
             ImGui::SliderInt4(
                 element.name.c_str(),
-                &intUniforms[intUniformIndex],
+                &m_IntUniforms[intUniformIndex],
                 element.minValue,
                 element.maxValue);
 
@@ -330,7 +305,7 @@ void Simulation::onUIRender()
         default:
             logWarning(
                 "The given uniform data type %s for the uniform named %s is invalid!",
-                convertUniformDataTypeToString(element.type),
+                convertUniformDataTypeToString(element.type).c_str(),
                 element.name.c_str());
             break;
         }
@@ -347,7 +322,7 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     }
 
     logTrace("This simulation has %d number of required fields", m_NumFields);
-    logTrace("The size of the fields vector is %d", fields.size());
+    logTrace("The size of the fields vector is %d", m_Fields.size());
     logTrace("The size of the phase vector is %d", m_PhaseTextures.size());
     logTrace("The size of the Laplacian vector is %d", m_LaplacianTextures.size());
     logTrace("The size of the string vector is %d", m_StringTextures.size());
@@ -358,34 +333,34 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     }
 
     // Reset timestep
-    timestep = 1;
+    m_CurrentTimestep = 1;
 
     // TODO: This doesn't need to happen every time we set field. Maybe have two functions, one to set a new field, and one to
     // reset to the original field.
-    originalFields = std::vector<std::shared_ptr<Texture2D>>(newFields);
+    m_FieldSnapshot = std::vector<std::shared_ptr<Texture2D>>(newFields);
 
     // Copy texture data overglClearTexImage
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
         logTrace("Field Index = %d", fieldIndex);
         logTrace("Source field index = %d", newFields[fieldIndex]->textureID);
-        logTrace("Dest field index = %d", fields[fieldIndex].textureID);
+        logTrace("Dest field index = %d", m_Fields[fieldIndex].textureID);
         // Set width and height for textures
         uint32_t height = newFields[fieldIndex]->height;
         uint32_t width = newFields[fieldIndex]->width;
-        fields[fieldIndex].width = width;
-        fields[fieldIndex].height = height;
+        m_Fields[fieldIndex].width = width;
+        m_Fields[fieldIndex].height = height;
 
         // Set work groups
         m_XNumGroups = ceil(width / 4);
         m_YNumGroups = ceil(height / 4);
 
         // Allocate data for textures
-        glBindTexture(GL_TEXTURE_2D, fields[fieldIndex].textureID);
+        glBindTexture(GL_TEXTURE_2D, m_Fields[fieldIndex].textureID);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
         glCopyImageSubData(
             newFields[fieldIndex]->textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
-            fields[fieldIndex].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
+            m_Fields[fieldIndex].textureID, GL_TEXTURE_2D, 0, 0, 0, 0,
             width, height, 1);
 
         // Resize Laplacian texture sizes if necessary
@@ -456,14 +431,14 @@ void Simulation::saveFields(const char *filePath)
     dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     try
     {
-        uint32_t numFields = fields.size();
+        uint32_t numFields = m_Fields.size();
 
         dataFile.open(filePath, std::ios::binary);
         // Write header
         dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
 
         // Read data
-        for (const auto &currentField : fields)
+        for (const auto &currentField : m_Fields)
         {
             glBindTexture(GL_TEXTURE_2D, currentField.textureID);
             int M, N;
@@ -594,37 +569,37 @@ void Simulation::saveStringNumbers(const char *filePath)
 
 Texture2D *Simulation::getRenderTexture(uint32_t fieldIndex)
 {
-    return &fields[fieldIndex];
+    return &m_Fields[fieldIndex];
 }
 
 Texture2D *Simulation::getCurrentRenderTexture()
 {
-    return &fields[renderIndex];
+    return &m_Fields[m_RenderIndex];
 }
 Texture2D *Simulation::getCurrentRealTexture()
 {
-    size_t realIndex = 2 * floor(renderIndex / 2);
-    return &fields[realIndex];
+    size_t realIndex = 2 * floor(m_RenderIndex / 2);
+    return &m_Fields[realIndex];
 }
 Texture2D *Simulation::getCurrentImagTexture()
 {
-    size_t imagIndex = ((int)(2 * floor(renderIndex / 2) + 1)) % fields.size();
-    return &fields[imagIndex];
+    size_t imagIndex = ((int)(2 * floor(m_RenderIndex / 2) + 1)) % m_Fields.size();
+    return &m_Fields[imagIndex];
 }
 
 Texture2D *Simulation::getCurrentLaplacian()
 {
-    return &m_LaplacianTextures[renderIndex];
+    return &m_LaplacianTextures[m_RenderIndex];
 }
 
 Texture2D *Simulation::getCurrentPhase()
 {
-    return &m_PhaseTextures[floor(renderIndex / 2)];
+    return &m_PhaseTextures[floor(m_RenderIndex / 2)];
 }
 
 Texture2D *Simulation::getCurrentStrings()
 {
-    return &m_StringTextures[floor(renderIndex / 2)];
+    return &m_StringTextures[floor(m_RenderIndex / 2)];
 }
 
 float Simulation::getMaxValue()
@@ -634,12 +609,12 @@ float Simulation::getMaxValue()
 
 float Simulation::getCurrentSimulationTime()
 {
-    return (timestep + 1) * dt;
+    return (m_CurrentTimestep + 1) * dt;
 }
 
 int Simulation::getCurrentSimulationTimestep()
 {
-    return timestep;
+    return m_CurrentTimestep;
 }
 
 Simulation *Simulation::createDomainWallSimulation()
@@ -948,10 +923,10 @@ void Simulation::calculatePhase()
         m_CalculatePhasePass->use();
         // Real part
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[(size_t)2 * phaseIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[(size_t)2 * phaseIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         // Imaginary part
         glActiveTexture(GL_TEXTURE1);
-        glBindImageTexture(1, fields[(size_t)2 * phaseIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_Fields[(size_t)2 * phaseIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         // Output phase texture
         glActiveTexture(GL_TEXTURE2);
         glBindImageTexture(2, m_PhaseTextures[phaseIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
@@ -970,10 +945,10 @@ void Simulation::detectStrings()
         m_DetectStringsPass->use();
         // Real part
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[(size_t)2 * stringIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[(size_t)2 * stringIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         // Imaginary part
         glActiveTexture(GL_TEXTURE1);
-        glBindImageTexture(1, fields[(size_t)2 * stringIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, m_Fields[(size_t)2 * stringIndex + 1].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         // Output string texture
         glActiveTexture(GL_TEXTURE2);
         glBindImageTexture(2, m_StringTextures[stringIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
@@ -991,17 +966,17 @@ void Simulation::calculateAcceleration()
 {
     // Calculate the acceleration
     m_CalculateAccelerationPass->use();
-    glUniform1f(0, timestep * dt);
+    glUniform1f(0, m_CurrentTimestep * dt);
     glUniform1f(1, dt);
     glUniform1i(2, era);
     bindUniforms();
     uint32_t bindIndex = 0;
     uint32_t activeTextureIndex = GL_TEXTURE0;
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
         // Bind field
         glActiveTexture(activeTextureIndex++);
-        glBindImageTexture(bindIndex++, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(bindIndex++, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Bind its Laplacian
         glActiveTexture(activeTextureIndex++);
         glBindImageTexture(bindIndex++, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
@@ -1026,14 +1001,14 @@ void Simulation::calculateAcceleration()
 void Simulation::updateAcceleration()
 {
     // Update acceleration
-    for (size_t fieldIndex = 0; fieldIndex < fields.size(); fieldIndex++)
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
         // Now acceleration can be updated
         m_UpdateAccelerationPass->use();
         glUniform1f(0, dt);
         // Bind field
         glActiveTexture(GL_TEXTURE0);
-        glBindImageTexture(0, fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+        glBindImageTexture(0, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
         // Dispatch and barrier
         glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -1043,7 +1018,7 @@ void Simulation::updateAcceleration()
 void Simulation::initialiseSimulation()
 {
     // Calculate phase if needed
-    if (fields.size() > 1)
+    if (m_Fields.size() > 1)
     {
         calculatePhase();
     }
@@ -1087,16 +1062,24 @@ int Simulation::getStringNumber(size_t stringIndex)
     return stringNumber;
 }
 
-int Simulation::getCurrentStringNumber()
+std::vector<int> Simulation::getCurrentStringNumber()
 {
-    size_t stringIndex = floor(renderIndex / 2);
-    if (m_StringNumbers.size() > 0 && m_StringNumbers[0].size() > 0)
+    size_t stringIndex = floor(m_RenderIndex / 2);
+    if (m_StringNumbers.size() > 0)
     {
-        return m_StringNumbers[0].back();
+        std::vector<int> result;
+        for (const auto &currentStringVector : m_StringNumbers)
+        {
+            if (currentStringVector.size() > 0)
+            {
+                result.push_back(currentStringVector.back());
+            }
+        }
+        return result;
     }
     else
     {
-        return 0;
+        return std::vector<int>();
     }
 }
 

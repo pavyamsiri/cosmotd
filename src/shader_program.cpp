@@ -1,9 +1,15 @@
-#include <shader_program.h>
+// Standard libraries
 #include <sstream>
-#include <log.h>
+
+// External libraries
 #include <glad/glad.h>
 
-int validateShaderProgramLinking(uint32_t programID)
+// Internal libraries
+#include "log.h"
+#include "shader_program.h"
+
+// Helper function that checks shader program linking, returning true if linking is successful.
+bool validateShaderProgramLinking(uint32_t programID)
 {
     GLint success;
     GLchar infoLog[1024];
@@ -12,10 +18,10 @@ int validateShaderProgramLinking(uint32_t programID)
     if (!success)
     {
         glGetProgramInfoLog(programID, 1024, NULL, infoLog);
-        logError("Failed to link shader program! - %s", infoLog);
-        return -1;
+        logError("Failed to link shader program with ID %d! - %s", programID, infoLog);
+        return false;
     }
-    return 0;
+    return true;
 }
 
 VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, Shader *fragmentShader)
@@ -31,33 +37,42 @@ VertexFragmentShaderProgram::VertexFragmentShaderProgram(Shader *vertexShader, S
         logError("The given fragment shader is not a fragment shader!");
         return;
     }
+    logDebug("Vertex/fragment shader program is being created...");
 
-    logDebug("Creating vertex/fragment shader program...");
+    // Generate ID
     programID = glCreateProgram();
     // Attach shaders
     glAttachShader(programID, vertexShader->shaderID);
     glAttachShader(programID, fragmentShader->shaderID);
     // Link program
     glLinkProgram(programID);
-    int linkResult;
-    linkResult = validateShaderProgramLinking(programID);
+    bool linkResult = validateShaderProgramLinking(programID);
     // Link success
-    if (linkResult == 0)
+    if (!linkResult)
     {
-        logDebug("Vertex/fragment shader program created with ID %d", programID);
+        glDeleteProgram(programID);
+        logError("Vertex/fragment shader program with ID %d has been deleted due to a linking error.", programID);
+        return;
+    }
+    else
+    {
         isInitialised = true;
+        logDebug("Vertex/fragment shader program has been created with ID %d.", programID);
+        return;
     }
 }
 
 VertexFragmentShaderProgram::~VertexFragmentShaderProgram()
 {
+    logDebug("Vertex/fragment shader program with ID %d is being destroyed...", programID);
     glDeleteProgram(programID);
-    logTrace("Vertex/Fragment shader program deleted.");
+    logDebug("Vertex/fragment shader program with ID %d has been destroyed.", programID);
 }
 
-const void VertexFragmentShaderProgram::use() const
+void VertexFragmentShaderProgram::use()
 {
     glUseProgram(programID);
+    logTrace("Using vertex/fragment shader program with ID %d.", programID);
 }
 
 ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
@@ -68,30 +83,39 @@ ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
         logError("The given compute shader is not a compute shader!");
         return;
     }
+    logDebug("Compute shader program is being created...");
 
-    logDebug("Creating compute shader program...");
+    // Generate ID
     programID = glCreateProgram();
     // Attach shaders
     glAttachShader(programID, computeShader->shaderID);
     // Link program
     glLinkProgram(programID);
-    int linkResult;
-    linkResult = validateShaderProgramLinking(programID);
+    bool linkResult = validateShaderProgramLinking(programID);
     // Link success
-    if (linkResult == 0)
+    if (!linkResult)
     {
-        logDebug("Compute shader program created with ID %d", programID);
+        glDeleteProgram(programID);
+        logError("Compute shader program with ID %d has been deleted due to a linking error.", programID);
+        return;
+    }
+    else
+    {
         isInitialised = true;
+        logDebug("Compute shader program has been created with ID %d.", programID);
+        return;
     }
 }
 
 ComputeShaderProgram::~ComputeShaderProgram()
 {
+    logDebug("Compute shader program with ID %d is being destroyed...", programID);
     glDeleteProgram(programID);
-    logTrace("Deleted compute shader program with ID %d", programID);
+    logDebug("Compute shader program with ID %d has been destroyed.", programID);
 }
 
-void const ComputeShaderProgram::use() const
+void ComputeShaderProgram::use()
 {
     glUseProgram(programID);
+    logTrace("Using compute shader program with ID %d.", programID);
 }
