@@ -1,14 +1,19 @@
-#include <glad/glad.h>
-#include <imgui.h>
+// Standard libraries
 #include <sstream>
 #include <fstream>
 #include <cmath>
 #include <random>
 
+// External libraries
+#include <glad/glad.h>
+#include <imgui.h>
+
+// Internal libraries
 #include "simulation.h"
 
 Simulation::~Simulation()
 {
+    // Call destructors
     delete m_EvolveFieldPass;
     delete m_EvolveVelocityPass;
     delete m_CalculateAccelerationPass;
@@ -18,15 +23,21 @@ Simulation::~Simulation()
     {
         delete m_CalculatePhasePass;
     }
+    if (!m_DetectStringsPass)
+    {
+        delete m_DetectStringsPass;
+    }
 }
 
 void Simulation::update()
 {
-    if (m_CurrentTimestep > maxTimesteps)
+    // Stop running after hitting max timesteps
+    if (m_CurrentTimestep >= maxTimesteps)
     {
         runFlag = false;
     }
 
+    // Do not update if not running
     if (!runFlag)
     {
         return;
@@ -94,9 +105,10 @@ void Simulation::update()
 
 void Simulation::bindUniforms()
 {
+    // The first 3 uniforms are already taken up by dx, dt and era.
     uint32_t currentLocation = 3;
 
-    // Reset uniform indices
+    // Uniform indices
     uint32_t floatUniformIndex = 0;
     uint32_t intUniformIndex = 0;
 
@@ -191,32 +203,36 @@ void Simulation::bindUniforms()
 
 void Simulation::onUIRender()
 {
-    if (ImGui::Checkbox("Running", &runFlag) && runFlag)
+    // Toggle running the simulation
+    if (ImGui::Checkbox("Running", &runFlag) && runFlag && m_CurrentTimestep == 1)
     {
-        initialiseSimulation();
+        // This should only happen once upon initialisation.
+        calculateAcceleration();
+        updateAcceleration();
     }
 
-    // Reset button
+    // Reset to snapshot
     if (ImGui::Button("Reset field"))
     {
         setField(m_FieldSnapshot);
     }
 
-    // Toggle field to display if there is more than one field
+    // Display field selector if there is more than one field
     if (m_Fields.size() > 1)
     {
         ImGui::SliderInt("Select fields", &m_RenderIndex, 0, m_Fields.size() - 1);
     }
 
+    // Universal simulation parameters
     ImGui::SliderFloat("dx", &dx, 0.1f, 10.0f);
     ImGui::SliderFloat("dt", &dt, 0.001f, 1.0f);
-
     ImGui::SliderInt("era", &era, 1, 2);
 
-    // Initialise uniform indices
+    // Uniform indices
     uint32_t floatUniformIndex = 0;
     uint32_t intUniformIndex = 0;
 
+    // Iterate through uniforms and expose them to UI
     for (const auto &element : m_Layout.m_Elements)
     {
         switch (element.type)
@@ -368,6 +384,8 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         {
             // Create new texture because old texture is of the wrong size
             m_LaplacianTextures[fieldIndex] = Texture2D();
+            m_LaplacianTextures[fieldIndex].setTextureFilter(TextureFilterLevel::MIN_MAG, TextureFilterMode::NEAREST);
+            m_LaplacianTextures[fieldIndex].setTextureWrap(TextureWrapAxis::UV, TextureWrapMode::REPEAT);
 
             glBindTexture(GL_TEXTURE_2D, m_LaplacianTextures[fieldIndex].textureID);
             glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, width, height);
@@ -400,9 +418,15 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         if (m_PhaseTextures.size() > 0)
         {
             size_t stringIndex = floor(fieldIndex / 2);
-            logTrace("Resizing string textures, index = %d", stringIndex);
             if (m_StringTextures[stringIndex].width != width || m_StringTextures[stringIndex].height != height)
             {
+                logTrace(
+                    "Resizing string textures, index = %d, from (%d, %d) to (%d, %d)",
+                    stringIndex,
+                    m_StringTextures[stringIndex].width,
+                    m_StringTextures[stringIndex].height,
+                    width,
+                    height);
                 // Create new texture because old texture is of the wrong size
                 m_StringTextures[stringIndex] = Texture2D();
 
@@ -422,7 +446,16 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         stringCount.clear();
     }
 
-    initialiseSimulation();
+    // Calculate Laplacian, phase and strings
+    calculateLaplacian();
+    if (m_Fields.size() > 1)
+    {
+        calculatePhase();
+    }
+    if (m_HasStrings)
+    {
+        detectStrings();
+    }
 }
 
 void Simulation::saveFields(const char *filePath)
@@ -913,6 +946,25 @@ Simulation *Simulation::createCompanionAxionSimulation()
         detectStringsPass,
         true,
         simulationLayout);
+}
+
+void Simulation::calculateLaplacian()
+{
+    // Bind each field texture and calculate the Laplacian
+    for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
+    {
+        // Calculate Laplacian
+        m_CalculateLaplacianPass->use();
+        glUniform1f(0, dx);
+        // Bind images
+        glActiveTexture(GL_TEXTURE0);
+        glBindImageTexture(0, m_Fields[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glActiveTexture(GL_TEXTURE1);
+        glBindImageTexture(1, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        // Dispatch and barrier
+        glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
 }
 
 void Simulation::calculatePhase()

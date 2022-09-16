@@ -57,13 +57,13 @@ void main()
     ivec2 centreLeftPos = ivec2(mod(pos.x - 1, size.x), pos.y);
     ivec2 centreRightPos = ivec2(mod(pos.x + 1, size.x), pos.y);
     // Positions: Vertical
-    ivec2 centreDownPos = ivec2(pos.x, mod(pos.y - 1, size.y));
-    ivec2 centreUpPos = ivec2(pos.x, mod(pos.y + 1, size.y));
+    ivec2 centreDownPos = ivec2(pos.x, mod(pos.y + 1, size.y));
+    ivec2 centreUpPos = ivec2(pos.x, mod(pos.y - 1, size.y));
     // Positions: Diagonals
-    ivec2 bottomLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y - 1, size.y));
-    ivec2 bottomRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y - 1, size.y));
-    ivec2 topLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y + 1, size.y));
-    ivec2 topRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y + 1, size.y));
+    ivec2 bottomLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y + 1, size.y));
+    ivec2 bottomRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y + 1, size.y));
+    ivec2 topLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y - 1, size.y));
+    ivec2 topRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y - 1, size.y));
 
     // Current cell
     float realCurrent = imageLoad(inRealFieldTexture, pos).r;

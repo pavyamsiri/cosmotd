@@ -234,6 +234,8 @@ public:
     void calculateAcceleration();
     // Updates the acceleration.
     void updateAcceleration();
+    // Calculates the Laplacian into a separate texture.
+    void calculateLaplacian();
     // Calculates the phase into a separate texture.
     void calculatePhase();
     // Highlights locations on the field which is next to a cosmic string.

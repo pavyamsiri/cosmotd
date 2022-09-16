@@ -57,12 +57,12 @@ Framebuffer::~Framebuffer()
 
 void Framebuffer::bind()
 {
-    logTrace("Framebuffer with ID %d is being bound.", framebufferID);
+    logLoop("Framebuffer with ID %d is being bound.", framebufferID);
     glBindFramebuffer(GL_FRAMEBUFFER, framebufferID);
 }
 
 void Framebuffer::unbind()
 {
-    logTrace("Framebuffer with ID %d is being unbound.", framebufferID);
+    logLoop("Framebuffer with ID %d is being unbound.", framebufferID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

@@ -71,8 +71,8 @@ VertexFragmentShaderProgram::~VertexFragmentShaderProgram()
 
 void VertexFragmentShaderProgram::use()
 {
+    logLoop("Using vertex/fragment shader program with ID %d.", programID);
     glUseProgram(programID);
-    logTrace("Using vertex/fragment shader program with ID %d.", programID);
 }
 
 ComputeShaderProgram::ComputeShaderProgram(Shader *computeShader)
@@ -116,6 +116,6 @@ ComputeShaderProgram::~ComputeShaderProgram()
 
 void ComputeShaderProgram::use()
 {
+    logLoop("Using compute shader program with ID %d.", programID);
     glUseProgram(programID);
-    logTrace("Using compute shader program with ID %d.", programID);
 }

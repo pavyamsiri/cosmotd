@@ -12,7 +12,8 @@ constexpr size_t MAX_LOG_SIZE = 32000;
 #include <windows.h>
 #include <wincon.h>
 
-static uint8_t logLevelColors[6] = {
+static uint8_t logLevelColors[7] = {
+    FOREGROUND_RED | FOREGROUND_BLUE,
     FOREGROUND_BLUE,
     FOREGROUND_GREEN,
     FOREGROUND_BLUE | FOREGROUND_GREEN,
@@ -22,7 +23,8 @@ constexpr uint8_t DEFAULT_COLOR = 7;
 
 void logWithLevel(LogLevel level, const char *messageFormat, ...)
 {
-    static const char *logLevelStrings[6] = {
+    static const char *logLevelStrings[7] = {
+        "[ LOOP  ]: ",
         "[ TRACE ]: ",
         "[ DEBUG ]: ",
         "[ INFO  ]: ",
@@ -45,6 +47,7 @@ void logWithLevel(LogLevel level, const char *messageFormat, ...)
     HANDLE hConsole;
     switch (level)
     {
+    case LogLevel::CLOOP:
     case LogLevel::CTRACE:
     case LogLevel::CDEBUG:
     case LogLevel::CINFO:
@@ -66,7 +69,8 @@ void logWithLevel(LogLevel level, const char *messageFormat, ...)
 
 void logWithLevel(LogLevel level, const char *messageFormat, ...)
 {
-    static const char *logLevelStrings[6] = {
+    static const char *logLevelStrings[7] = {
+        "[ LOOP  ]: ",
         "[ TRACE ]: ",
         "[ DEBUG ]: ",
         "[ INFO  ]: ",

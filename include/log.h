@@ -11,15 +11,22 @@
 
 enum class LogLevel
 {
-    CTRACE = 0,
-    CDEBUG = 1,
-    CINFO = 2,
-    CWARNING = 3,
-    CERROR = 4,
-    CFATAL = 5,
+    CLOOP = 0,
+    CTRACE = 1,
+    CDEBUG = 2,
+    CINFO = 3,
+    CWARNING = 4,
+    CERROR = 5,
+    CFATAL = 6,
 };
 
 void logWithLevel(LogLevel level, const char *messageFormat, ...);
+
+#ifdef LOG_LEVEL_LOOP
+#define logLoop(messageFormat, ...) logWithLevel(LogLevel::CLOOP, messageFormat, ##__VA_ARGS__);
+#else
+#define logLoop(messageFormat, ...)
+#endif
 
 #ifdef LOG_LEVEL_TRACE
 #define logTrace(messageFormat, ...) logWithLevel(LogLevel::CTRACE, messageFormat, ##__VA_ARGS__);

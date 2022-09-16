@@ -52,33 +52,33 @@ Texture2D::Texture2D()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     // Set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     logDebug("Texture2D successfully created with ID %d.", textureID);
 }
 
 void Texture2D::bindUnit(uint32_t target)
 {
-    logTrace("Binding Texture2D with ID %d to unit %d.", textureID, target);
+    logLoop("Binding Texture2D with ID %d to unit %d.", textureID, target);
     glBindTextureUnit(target, textureID);
 }
 
 void Texture2D::unbindUnit(uint32_t target)
 {
-    logTrace("Unbinding Texture2D with ID %d from unit %d.", textureID, target);
+    logLoop("Unbinding Texture2D with ID %d from unit %d.", textureID, target);
     glBindTextureUnit(target, 0);
 }
 
 void Texture2D::bind()
 {
-    logTrace("Binding Texture2D with ID %d.", textureID);
+    logLoop("Binding Texture2D with ID %d.", textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 }
 
 void Texture2D::unbind()
 {
-    logTrace("Unbinding Texture2D with ID %d.", textureID);
+    logLoop("Unbinding Texture2D with ID %d.", textureID);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 

@@ -106,13 +106,13 @@ VertexBuffer::~VertexBuffer()
 
 void VertexBuffer::bind()
 {
-    logTrace("Binding vertex buffer with ID %d.", bufferID);
+    logLoop("Binding vertex buffer with ID %d.", bufferID);
     glBindBuffer(GL_ARRAY_BUFFER, bufferID);
 }
 
 void VertexBuffer::unbind()
 {
-    logTrace("Unbinding vertex buffer with ID %d.", bufferID);
+    logLoop("Unbinding vertex buffer with ID %d.", bufferID);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -134,13 +134,13 @@ IndexBuffer::~IndexBuffer()
 
 void IndexBuffer::bind()
 {
-    logTrace("Binding index buffer with ID %d.", bufferID);
+    logLoop("Binding index buffer with ID %d.", bufferID);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
 }
 
 void IndexBuffer::unbind()
 {
-    logTrace("Unbinding index buffer with ID %d.", bufferID);
+    logLoop("Unbinding index buffer with ID %d.", bufferID);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
 }
 
@@ -308,11 +308,11 @@ void VertexArray::bindIndexBuffer(IndexBuffer *indexBuffer)
 
 void VertexArray::bind()
 {
-    logTrace("Binding vertex array with ID %d...", arrayID);
+    logLoop("Binding vertex array with ID %d...", arrayID);
     glBindVertexArray(arrayID);
 }
 void VertexArray::unbind()
 {
-    logTrace("Unbinding vertex array with ID %d...", arrayID);
+    logLoop("Unbinding vertex array with ID %d...", arrayID);
     glBindVertexArray(0);
 }

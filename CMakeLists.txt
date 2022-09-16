@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Log levels
+# add_compile_definitions(LOG_LEVEL_LOOP)
 add_compile_definitions(LOG_LEVEL_TRACE)
 add_compile_definitions(LOG_LEVEL_DEBUG)
 add_compile_definitions(LOG_LEVEL_INFO)

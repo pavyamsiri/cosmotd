@@ -218,7 +218,7 @@ Application::Application(int width, int height, const char *title)
     this->m_MainViewportVertexArray = vertexArray;
 
     // Create framebuffer (1080p)
-    Framebuffer *framebuffer = new Framebuffer(1920, 1080);
+    Framebuffer *framebuffer = new Framebuffer(1024, 1024);
     this->m_Framebuffer = framebuffer;
 
     // Create topological defect simulation. Default is domain walls.
