@@ -209,10 +209,10 @@ std::vector<std::shared_ptr<Texture2D>> Texture2D::loadCTDD(const char *filePath
             glGenerateMipmap(GL_TEXTURE_2D);
 
             // TODO: This is probably unnecessary, however this will be kept for a bit in case it is necessary.
-            // // Set texture storage parameters
-            // glTextureStorage2D(fields[fieldIndex]->textureID, 1, GL_RGBA32F, N, M);
-            // // Set texture access parameters
-            // glBindImageTexture(0, fields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+            // Set texture storage parameters
+            glTextureStorage2D(fields[fieldIndex]->textureID, 1, GL_RGBA32F, N, M);
+            // Set texture access parameters
+            glBindImageTexture(0, fields[fieldIndex]->textureID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
             // Clear texture data
             textureData.clear();

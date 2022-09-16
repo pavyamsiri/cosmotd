@@ -580,6 +580,28 @@ void Application::onImGuiRender()
                 logError("Save file dialog error: %s", NFD_GetError());
             }
         }
+        if (ImGui::Button("Save Laplacian as"))
+        {
+            nfdchar_t *outPath;
+            nfdfilteritem_t filterItem[1] = {{"cosmotd Data Files", "ctdd"}};
+            nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, nullptr, nullptr);
+            if (result == NFD_OKAY)
+            {
+                m_Simulation->saveLaplacians(outPath);
+                logDebug("Saving Laplacians at path %s", outPath);
+
+                // Free file path after use
+                NFD_FreePath(outPath);
+            }
+            else if (result == NFD_CANCEL)
+            {
+                logDebug("Cancelling save file dialog...");
+            }
+            else
+            {
+                logError("Save file dialog error: %s", NFD_GetError());
+            }
+        }
         if (ImGui::Button("Save string counts as"))
         {
             nfdchar_t *outPath;
@@ -603,7 +625,8 @@ void Application::onImGuiRender()
             }
         }
 
-        // Random
+        // NOTE: The field dimensions should always be a multiple of 8 in order for the simulation to run properly, and also
+        // power of 2. This means the supported values are 8, 16, 32, 64, 128, 256, 512, 1024
         static int fieldWidth = 256;
         static int fieldHeight = 256;
         static int seed = 0;
@@ -741,8 +764,10 @@ void Application::onImGuiRender()
 
     if (ImGui::Begin("Main Viewport", nullptr, ImGuiWindowFlags_NoScrollbar))
     {
-        constexpr uint32_t imageWidth = 1176;
-        constexpr uint32_t imageHeight = 1003;
+        // constexpr uint32_t imageWidth = 1176;
+        // constexpr uint32_t imageHeight = 1003;
+        constexpr uint32_t imageWidth = 1024;
+        constexpr uint32_t imageHeight = 1024;
         constexpr ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
         ImGui::Image((void *)(intptr_t)m_Framebuffer->getTextureID(), imageSize);
     }

@@ -1,26 +1,26 @@
 #version 460 core
 // Work group specification
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 // In/Out: Phi real field texture
 layout(rgba32f, binding = 0) restrict uniform image2D phiRealFieldTexture;
 // In: Phi real Laplacian texture
-layout(r32f, binding = 1) readonly uniform image2D inPhiRealLaplacianTexture;
+layout(r32f, binding = 1) restrict readonly uniform image2D inPhiRealLaplacianTexture;
 
 // In/Out: Phi imaginary field texture
 layout(rgba32f, binding = 2) restrict uniform image2D phiImagFieldTexture;
 // In: Phi imaginary Laplacian texture
-layout(r32f, binding = 3) readonly uniform image2D inPhiImagLaplacianTexture;
+layout(r32f, binding = 3) restrict readonly uniform image2D inPhiImagLaplacianTexture;
 
 // In/Out: Psi real field texture
 layout(rgba32f, binding = 4) restrict uniform image2D psiRealFieldTexture;
 // In: Psi real Laplacian texture
-layout(r32f, binding = 5) readonly uniform image2D inPsiRealLaplacianTexture;
+layout(r32f, binding = 5) restrict readonly uniform image2D inPsiRealLaplacianTexture;
 
 // In/Out: Psi imaginary field texture
 layout(rgba32f, binding = 6) restrict uniform image2D psiImagFieldTexture;
 // In: Psi imaginary Laplacian texture
-layout(r32f, binding = 7) readonly uniform image2D inPsiImagLaplacianTexture;
+layout(r32f, binding = 7) restrict readonly uniform image2D inPsiImagLaplacianTexture;
 
 // TODO: Need to use array textures because we ran out of bind targets
 // // In: Phi phase texture

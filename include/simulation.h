@@ -187,6 +187,8 @@ public:
 
     // Saves fields as ctdd files
     void saveFields(const char *filePath);
+    // Saves Laplacians as ctdd files
+    void saveLaplacians(const char *filePath);
     // Saves phases as ctdd files
     void savePhases(const char *filePath);
     // Saves string numbers as a data file

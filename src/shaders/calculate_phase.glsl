@@ -1,12 +1,12 @@
 #version 460 core
 // Work groups
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 // In: Real field texture
-layout(rgba32f, binding = 0) readonly uniform image2D inRealFieldTexture;
+layout(rgba32f, binding = 0) restrict readonly uniform image2D inRealFieldTexture;
 // In: Imaginary field texture
-layout(rgba32f, binding = 1) readonly uniform image2D inImagFieldTexture;
+layout(rgba32f, binding = 1) restrict readonly uniform image2D inImagFieldTexture;
 // Out: Phase texture
-layout(r32f, binding = 2) writeonly uniform image2D outPhaseTexture;
+layout(r32f, binding = 2) restrict writeonly uniform image2D outPhaseTexture;
 
 const float PI = 3.1415926535897932384626433832795f;
 

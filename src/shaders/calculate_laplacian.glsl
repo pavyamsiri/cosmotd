@@ -1,10 +1,10 @@
 #version 460 core
 // Work group specification
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 // In: Field texture
-layout(rgba32f, binding = 0) readonly uniform image2D inFieldTexture;
+layout(rgba32f, binding = 0) restrict readonly uniform image2D inFieldTexture;
 // Out: Laplacian texture
-layout(r32f, binding = 1) writeonly uniform image2D outLaplacianTexture;
+layout(r32f, binding = 1) restrict writeonly uniform image2D outLaplacianTexture;
 
 // Uniforms: spatial interval
 layout(location=0) uniform float dx;

@@ -368,8 +368,8 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         m_Fields[fieldIndex].height = height;
 
         // Set work groups
-        m_XNumGroups = ceil(width / 4);
-        m_YNumGroups = ceil(height / 4);
+        m_XNumGroups = ceil(width / 8);
+        m_YNumGroups = ceil(height / 8);
 
         // Allocate data for textures
         glBindTexture(GL_TEXTURE_2D, m_Fields[fieldIndex].textureID);
@@ -502,6 +502,57 @@ void Simulation::saveFields(const char *filePath)
 
         dataFile.close();
         logTrace("Successfully wrote field data to binary file!");
+    }
+    catch (std::ifstream::failure &e)
+    {
+        logError("Failed to open file to write to at path: %s - %s", filePath, e.what());
+    }
+}
+
+void Simulation::saveLaplacians(const char *filePath)
+{
+    std::ofstream dataFile;
+    dataFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        uint32_t numFields = m_LaplacianTextures.size();
+
+        dataFile.open(filePath, std::ios::binary);
+        // Write header
+        dataFile.write(reinterpret_cast<char *>(&numFields), sizeof(uint32_t));
+
+        // Read data
+        for (const auto &currentLaplacian : m_LaplacianTextures)
+        {
+            glBindTexture(GL_TEXTURE_2D, currentLaplacian.textureID);
+            int M, N;
+            int miplevel = 0;
+            float currentTime = getCurrentSimulationTime();
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_HEIGHT, &M);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, miplevel, GL_TEXTURE_WIDTH, &N);
+            dataFile.write(reinterpret_cast<char *>(&M), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&N), sizeof(uint32_t));
+            dataFile.write(reinterpret_cast<char *>(&currentTime), sizeof(float));
+
+            std::vector<float> textureData(M * N);
+
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_FLOAT, static_cast<void *>(textureData.data()));
+            glBindTexture(GL_TEXTURE_2D, 0);
+            for (int rowIndex = 0; rowIndex < M; rowIndex++)
+            {
+                for (int columnIndex = 0; columnIndex < N; columnIndex++)
+                {
+                    size_t currentIndex = (rowIndex * N) + columnIndex;
+                    float laplacianValue = textureData[currentIndex];
+                    float fillerValue = 0;
+                    dataFile.write(reinterpret_cast<char *>(&laplacianValue), sizeof(float));
+                    dataFile.write(reinterpret_cast<char *>(&fillerValue), sizeof(float));
+                }
+            }
+        }
+
+        dataFile.close();
+        logTrace("Successfully wrote phase data to binary file!");
     }
     catch (std::ifstream::failure &e)
     {

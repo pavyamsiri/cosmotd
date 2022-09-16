@@ -1,19 +1,19 @@
 #version 460 core
 // Work group specification
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 // In/Out: Real field texture
 layout(rgba32f, binding = 0) restrict uniform image2D realFieldTexture;
 // In: Real Laplacian texture
-layout(r32f, binding = 1) readonly uniform image2D inRealLaplacianTexture;
+layout(r32f, binding = 1) restrict readonly uniform image2D inRealLaplacianTexture;
 
 // In/Out: Imaginary field texture
 layout(rgba32f, binding = 2) restrict uniform image2D imagFieldTexture;
 // In: Imaginary Laplacian texture
-layout(r32f, binding = 3) readonly uniform image2D inImagLaplacianTexture;
+layout(r32f, binding = 3) restrict readonly uniform image2D inImagLaplacianTexture;
 
 // In: Phase texture
-layout(r32f, binding = 4) readonly uniform image2D inPhaseTexture;
+layout(r32f, binding = 4) restrict readonly uniform image2D inPhaseTexture;
 
 // Universal simulation uniform parameters
 layout(location=0) uniform float time;

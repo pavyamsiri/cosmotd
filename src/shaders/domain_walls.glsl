@@ -1,11 +1,11 @@
 #version 460 core
 // Work group specification
-layout(local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 // In/Out: Field texture
 layout(rgba32f, binding = 0) restrict uniform image2D fieldTexture;
 // In: Laplacian texture
-layout(r32f, binding = 1) readonly uniform image2D inLaplacianTexture;
+layout(r32f, binding = 1) restrict readonly uniform image2D inLaplacianTexture;
 
 // Universal simulation uniform parameters
 layout(location=0) uniform float time;
