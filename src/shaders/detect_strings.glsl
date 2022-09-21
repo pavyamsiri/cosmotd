@@ -11,16 +11,15 @@ layout(r32f, binding = 2) restrict writeonly uniform image2D outStringTexture;
 
 // Returns of the handedness of a real crossing as +-1.
 int calculateCrossingHandedness(
-    float realCurrent, float imagCurrent,
-    float realNext, float imagNext
+    float realCurrent, float imagCurrent, float realNext, float imagNext
 ) {
-        int result = int(sign(realNext * imagCurrent - realCurrent * imagNext));
-        return result;
+        float result = realNext * imagCurrent - realCurrent * imagNext;
+        return int(sign(result));
 }
 
 // Returns `1` if the link crosses the real axis, otherwise returns `0`.
 int calculateRealCrossing(float imagCurrent, float imagNext) {
-    int result = int(imagCurrent * imagNext < 0);
+    int result = int((imagCurrent * imagNext) < 0);
     return result;
 }
 
@@ -28,10 +27,11 @@ int calculateRealCrossing(float imagCurrent, float imagNext) {
 int checkPlaquette(
     float realTopLeft, float imagTopLeft,
     float realTopRight, float imagTopRight,
-    float realBottomLeft, float imagBottomLeft,
-    float realBottomRight, float imagBottomRight
+    float realBottomRight, float imagBottomRight,
+    float realBottomLeft, float imagBottomLeft
 ) {
         int result = 0;
+
         // Check top left to top right link for crossing handedness
         result += calculateRealCrossing(imagTopLeft, imagTopRight)
             * calculateCrossingHandedness(realTopLeft, imagTopLeft, realTopRight, imagTopRight);
@@ -45,7 +45,7 @@ int checkPlaquette(
         result += calculateRealCrossing(imagBottomLeft, imagTopLeft)
             * calculateCrossingHandedness(realBottomLeft, imagBottomLeft, realTopLeft, imagTopLeft);
 
-        return sign(result);
+        return result;
 }
 
 void main()
@@ -57,13 +57,13 @@ void main()
     ivec2 centreLeftPos = ivec2(mod(pos.x - 1, size.x), pos.y);
     ivec2 centreRightPos = ivec2(mod(pos.x + 1, size.x), pos.y);
     // Positions: Vertical
-    ivec2 centreDownPos = ivec2(pos.x, mod(pos.y + 1, size.y));
-    ivec2 centreUpPos = ivec2(pos.x, mod(pos.y - 1, size.y));
+    ivec2 centreDownPos = ivec2(pos.x, mod(pos.y - 1, size.y));
+    ivec2 centreUpPos = ivec2(pos.x, mod(pos.y + 1, size.y));
     // Positions: Diagonals
-    ivec2 bottomLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y + 1, size.y));
-    ivec2 bottomRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y + 1, size.y));
-    ivec2 topLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y - 1, size.y));
-    ivec2 topRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y - 1, size.y));
+    ivec2 bottomLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y - 1, size.y));
+    ivec2 bottomRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y - 1, size.y));
+    ivec2 topLeftPos = ivec2(mod(pos.x - 1, size.x), mod(pos.y + 1, size.y));
+    ivec2 topRightPos = ivec2(mod(pos.x + 1, size.x), mod(pos.y + 1, size.y));
 
     // Current cell
     float realCurrent = imageLoad(inRealFieldTexture, pos).r;
@@ -91,13 +91,33 @@ void main()
     int highlighted = 0;
 
     // Top left plaquette
-    highlighted += checkPlaquette(realTopLeft, imagTopLeft, realCentreUp, imagCentreUp, realCurrent, imagCurrent, realCentreLeft, imagCentreLeft);
+    highlighted += checkPlaquette(
+        realTopLeft, imagTopLeft,
+        realCentreUp, imagCentreUp,
+        realCurrent, imagCurrent,
+        realCentreLeft, imagCentreLeft
+    );
     // Top right plaquette
-    highlighted += checkPlaquette(realCentreUp, imagCentreUp, realTopRight, imagTopRight, realCentreRight, imagCentreRight, realCurrent, imagCurrent);
+    highlighted += checkPlaquette(
+        realCentreUp, imagCentreUp,
+        realTopRight, imagTopRight,
+        realCentreRight, imagCentreRight,
+        realCurrent, imagCurrent
+    );
     // Bottom right plaquette
-    highlighted += checkPlaquette(realCurrent, imagCurrent, realCentreRight, imagCentreRight, realBottomRight, imagBottomRight, realCentreDown, imagCentreDown);
+    highlighted += checkPlaquette(
+        realCurrent, imagCurrent,
+        realCentreRight, imagCentreRight,
+        realBottomRight, imagBottomRight,
+        realCentreDown, imagCentreDown
+    );
     // Bottom left plaquette
-    highlighted += checkPlaquette(realCentreLeft, imagCentreLeft, realCurrent, imagCurrent, realCentreDown, imagCentreDown, realBottomLeft, imagBottomLeft);
+    highlighted += checkPlaquette(
+        realCentreLeft, imagCentreLeft,
+        realCurrent, imagCurrent,
+        realCentreDown, imagCentreDown,
+        realBottomLeft, imagBottomLeft
+    );
 
     // Clamp result to between -1 and 1
     highlighted = clamp(highlighted, -1, 1);

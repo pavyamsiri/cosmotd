@@ -1,7 +1,8 @@
 // Standard libraries
-#include <sstream>
-#include <fstream>
+#include <chrono>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 #include <random>
 
 // External libraries
@@ -358,9 +359,6 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
     // Copy texture data overglClearTexImage
     for (size_t fieldIndex = 0; fieldIndex < m_Fields.size(); fieldIndex++)
     {
-        logTrace("Field Index = %d", fieldIndex);
-        logTrace("Source field index = %d", newFields[fieldIndex]->textureID);
-        logTrace("Dest field index = %d", m_Fields[fieldIndex].textureID);
         // Set width and height for textures
         uint32_t height = newFields[fieldIndex]->height;
         uint32_t width = newFields[fieldIndex]->width;
@@ -401,7 +399,6 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         if (m_PhaseTextures.size() > 0)
         {
             size_t phaseIndex = floor(fieldIndex / 2);
-            logTrace("Resizing phase textures, index = %d", phaseIndex);
             if (m_PhaseTextures[phaseIndex].width != width || m_PhaseTextures[phaseIndex].height != height)
             {
                 // Create new texture because old texture is of the wrong size
@@ -420,13 +417,6 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
             size_t stringIndex = floor(fieldIndex / 2);
             if (m_StringTextures[stringIndex].width != width || m_StringTextures[stringIndex].height != height)
             {
-                logTrace(
-                    "Resizing string textures, index = %d, from (%d, %d) to (%d, %d)",
-                    stringIndex,
-                    m_StringTextures[stringIndex].width,
-                    m_StringTextures[stringIndex].height,
-                    width,
-                    height);
                 // Create new texture because old texture is of the wrong size
                 m_StringTextures[stringIndex] = Texture2D();
 
@@ -1243,12 +1233,20 @@ void Simulation::randomiseFields(uint32_t width, uint32_t height, uint32_t seed)
     setField(newFields);
 }
 
-void Simulation::runRandomTrials(uint32_t numTrials)
+void Simulation::runRandomTrials(uint32_t width, uint32_t height, uint32_t numTrials, uint32_t startSeed)
 {
+    // Generate seeds
+    std::default_random_engine seedGenerator;
+    seedGenerator.seed(startSeed);
+    std::uniform_int_distribution<uint32_t> seedDistribution(0, UINT32_MAX);
+
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     for (size_t trialIndex = 0; trialIndex < numTrials; trialIndex++)
     {
-        randomiseFields(256, 256, trialIndex);
-        logInfo("Beginning trial %d", trialIndex);
+        uint32_t currentSeed = seedDistribution(seedGenerator);
+        logInfo("Beginning trial %d with seed %d", trialIndex, currentSeed);
+        randomiseFields(width, height, currentSeed);
         runFlag = true;
 
         for (size_t timestepIndex = 0; timestepIndex < maxTimesteps; timestepIndex++)
@@ -1257,9 +1255,18 @@ void Simulation::runRandomTrials(uint32_t numTrials)
         }
 
         std::stringstream nameStream;
-        nameStream << "data/string_count_trial" << trialIndex << ".data";
+        nameStream << "data/trial_data/string_count_trial" << trialIndex << ".ctdsd";
 
         saveStringNumbers(nameStream.str().c_str());
     }
-    logInfo("Trials are complete!");
+
+    auto stopTime = std::chrono::high_resolution_clock::now();
+
+    int64_t durationHours = duration_cast<std::chrono::hours>(stopTime - startTime).count();
+    int64_t durationMinutes = duration_cast<std::chrono::minutes>(stopTime - startTime).count() % 60;
+    int64_t durationSeconds = duration_cast<std::chrono::seconds>(stopTime - startTime).count() % 60;
+
+    logInfo(
+        "Finished %d trials, taking %lld hours, %lld minutes and %lld seconds.",
+        numTrials, durationHours, durationMinutes, durationSeconds);
 }

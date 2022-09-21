@@ -89,7 +89,7 @@ private:
     double m_AverageTickRate = 0.0f;
 
     // TODO: Make this cleaner and easier to add to
-    const char *m_currentPlottingProcedure = "Smooth Phase";
-    size_t m_currentPlottingProcedureIndex = 2;
-    const char *m_currentSimulationProcedure = "Domain walls";
+    const char *m_currentPlottingProcedure = "Strings";
+    size_t m_currentPlottingProcedureIndex = 4;
+    const char *m_currentSimulationProcedure = "Cosmic strings";
 };

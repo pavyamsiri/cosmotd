@@ -222,9 +222,9 @@ Application::Application(int width, int height, const char *title)
     this->m_Framebuffer = framebuffer;
 
     // Create topological defect simulation. Default is domain walls.
-    this->m_Simulation = Simulation::createDomainWallSimulation();
+    this->m_Simulation = Simulation::createCosmicStringSimulation();
     // Set default field
-    m_Simulation->setField(Texture2D::loadCTDD("data/default/domain_walls_M200_N200_np20228.ctdd"));
+    m_Simulation->setField(Texture2D::loadCTDD("data/default/cosmic_strings_M256_N256_np20228.ctdd"));
 
     logTrace("Default simulation successfully initialised.");
 
@@ -686,11 +686,6 @@ void Application::onImGuiRender()
             }
         }
 
-        if (ImGui::Button("Run trials"))
-        {
-            m_Simulation->runRandomTrials(100);
-        }
-
         const char *availablePlottingProcedures[] = {"Field", "Raw Phase", "Smooth Phase", "Laplacian", "Strings"};
 
         if (ImGui::BeginCombo("Plotting", m_currentPlottingProcedure))
@@ -728,25 +723,25 @@ void Application::onImGuiRender()
                     {
                         m_Simulation = Simulation::createDomainWallSimulation();
                         // Set field
-                        m_Simulation->setField(Texture2D::loadCTDD("data/default/domain_walls_M200_N200_np20228.ctdd"));
+                        m_Simulation->setField(Texture2D::loadCTDD("data/default/domain_walls_M256_N256_np20228.ctdd"));
                     }
                     else if (n == 1)
                     {
                         m_Simulation = Simulation::createCosmicStringSimulation();
                         // Set field
-                        m_Simulation->setField(Texture2D::loadCTDD("data/default/cosmic_strings_M200_N200_np20228.ctdd"));
+                        m_Simulation->setField(Texture2D::loadCTDD("data/default/cosmic_strings_M256_N256_np20228.ctdd"));
                     }
                     else if (n == 2)
                     {
                         m_Simulation = Simulation::createSingleAxionSimulation();
                         // Set field
-                        m_Simulation->setField(Texture2D::loadCTDD("data/default/single_axion_M300_N300_np20228.ctdd"));
+                        m_Simulation->setField(Texture2D::loadCTDD("data/default/single_axion_M256_N256_np20228.ctdd"));
                     }
                     else if (n == 3)
                     {
                         m_Simulation = Simulation::createCompanionAxionSimulation();
                         // Set field
-                        m_Simulation->setField(Texture2D::loadCTDD("data/default/companion_axion_M300_N300_np20228.ctdd"));
+                        m_Simulation->setField(Texture2D::loadCTDD("data/default/companion_axion_M256_N256_np20228.ctdd"));
                     }
                 }
                 if (isSelected)
@@ -759,6 +754,17 @@ void Application::onImGuiRender()
 
         ImGui::Text("Simulation Controls and Parameters");
         m_Simulation->onUIRender();
+
+        static int numTrials = 100;
+        static int trialSeed = 0;
+
+        ImGui::InputInt("Number of trials", &numTrials);
+        ImGui::InputInt("Starting Seed", &trialSeed);
+
+        if (ImGui::Button("Run trials"))
+        {
+            m_Simulation->runRandomTrials(fieldWidth, fieldHeight, numTrials, trialSeed);
+        }
     }
     ImGui::End();
 
