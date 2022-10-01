@@ -195,7 +195,7 @@ public:
     void saveStringNumbers(const char *filePath);
 
     // Runs a number of random trials and saves the string numbers for each timestep to the data folder
-    void runRandomTrials(uint32_t width, uint32_t height, uint32_t numTrials, uint32_t startSeed);
+    void runRandomTrials(uint32_t width, uint32_t height, uint32_t numTrials, uint32_t startSeed, std::string outFolder);
 
     // Updates the simulation by one timestep
     void update();

@@ -12,8 +12,8 @@ layout(rgba32f, binding = 2) restrict uniform image2D imagFieldTexture;
 // In: Imaginary Laplacian texture
 layout(r32f, binding = 3) restrict readonly uniform image2D inImagLaplacianTexture;
 
-// In: Phase texture
-layout(r32f, binding = 4) restrict readonly uniform image2D inPhaseTexture;
+// // In: Phase texture
+// layout(r32f, binding = 4) restrict readonly uniform image2D inPhaseTexture;
 
 // Universal simulation uniform parameters
 layout(location=0) uniform float time;
@@ -49,7 +49,7 @@ void main() {
     float realCurrentAcceleration = realField.b;
     float imagCurrentAcceleration = imagField.b;
     // Phase
-    float phase = imageLoad(inPhaseTexture, pos).r;
+    float phase = atan(imagNextValue, realNextValue);
 
     // Square amplitude of complex field
     float squareAmplitude = pow(realNextValue, 2) + pow(imagNextValue, 2);

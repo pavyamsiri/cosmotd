@@ -10,6 +10,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_stdlib.h>
 #include <nfd.h>
 
 // Internal libraries
@@ -755,6 +756,10 @@ void Application::onImGuiRender()
         ImGui::Text("Simulation Controls and Parameters");
         m_Simulation->onUIRender();
 
+        static std::string outFolder = std::string("trial_data");
+
+        ImGui::InputText("Output folder", &outFolder);
+
         static int numTrials = 100;
         static int trialSeed = 0;
 
@@ -763,18 +768,18 @@ void Application::onImGuiRender()
 
         if (ImGui::Button("Run trials"))
         {
-            m_Simulation->runRandomTrials(fieldWidth, fieldHeight, numTrials, trialSeed);
+            m_Simulation->runRandomTrials(fieldWidth, fieldHeight, numTrials, trialSeed, outFolder);
         }
     }
     ImGui::End();
 
     if (ImGui::Begin("Main Viewport", nullptr, ImGuiWindowFlags_NoScrollbar))
     {
-        // constexpr uint32_t imageWidth = 1176;
-        // constexpr uint32_t imageHeight = 1003;
         constexpr uint32_t imageWidth = 1024;
         constexpr uint32_t imageHeight = 1024;
         constexpr ImVec2 imageSize = ImVec2(imageWidth, imageHeight);
+        ImVec2 centrePos = ImVec2(0.5f * (ImGui::GetWindowSize().x - imageWidth), 0.5f * (ImGui::GetWindowSize().y - imageHeight));
+        ImGui::SetCursorPos(centrePos);
         ImGui::Image((void *)(intptr_t)m_Framebuffer->getTextureID(), imageSize);
     }
     ImGui::End();

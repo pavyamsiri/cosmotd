@@ -1,6 +1,8 @@
 // Standard libraries
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <random>
@@ -338,17 +340,6 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         return;
     }
 
-    logTrace("This simulation has %d number of required fields", m_NumFields);
-    logTrace("The size of the fields vector is %d", m_Fields.size());
-    logTrace("The size of the phase vector is %d", m_PhaseTextures.size());
-    logTrace("The size of the Laplacian vector is %d", m_LaplacianTextures.size());
-    logTrace("The size of the string vector is %d", m_StringTextures.size());
-    logTrace("The size of the string numbers vector is %d", m_StringNumbers.size());
-    if (m_StringNumbers.size() > 0)
-    {
-        logTrace("The size of the string numbers vector (count vector) is %d", m_StringNumbers[0].size());
-    }
-
     // Reset timestep
     m_CurrentTimestep = 1;
 
@@ -366,8 +357,8 @@ void Simulation::setField(std::vector<std::shared_ptr<Texture2D>> newFields)
         m_Fields[fieldIndex].height = height;
 
         // Set work groups
-        m_XNumGroups = ceil(width / 8);
-        m_YNumGroups = ceil(height / 8);
+        m_XNumGroups = std::max((uint32_t)ceil(width / 8), (uint32_t)1);
+        m_YNumGroups = std::max((uint32_t)ceil(height / 8), (uint32_t)1);
 
         // Allocate data for textures
         glBindTexture(GL_TEXTURE_2D, m_Fields[fieldIndex].textureID);
@@ -491,7 +482,7 @@ void Simulation::saveFields(const char *filePath)
         }
 
         dataFile.close();
-        logTrace("Successfully wrote field data to binary file!");
+        logTrace("Successfully wrote field data to binary file at path %s", filePath);
     }
     catch (std::ifstream::failure &e)
     {
@@ -542,7 +533,7 @@ void Simulation::saveLaplacians(const char *filePath)
         }
 
         dataFile.close();
-        logTrace("Successfully wrote phase data to binary file!");
+        logTrace("Successfully wrote Laplacian data to binary file at path %s", filePath);
     }
     catch (std::ifstream::failure &e)
     {
@@ -593,7 +584,7 @@ void Simulation::savePhases(const char *filePath)
         }
 
         dataFile.close();
-        logTrace("Successfully wrote phase data to binary file!");
+        logTrace("Successfully wrote phase data to binary file at path %s", filePath);
     }
     catch (std::ifstream::failure &e)
     {
@@ -621,6 +612,8 @@ void Simulation::saveStringNumbers(const char *filePath)
         // Write the number of timesteps. This should be the same across both
         uint32_t numTimesteps = m_StringNumbers[0].size();
         dataFile.write(reinterpret_cast<char *>(&numTimesteps), sizeof(uint32_t));
+        // The time step used
+        dataFile.write(reinterpret_cast<char *>(&dt), sizeof(float));
 
         for (size_t fieldIndex = 0; fieldIndex < m_StringNumbers.size(); fieldIndex++)
         {
@@ -633,7 +626,7 @@ void Simulation::saveStringNumbers(const char *filePath)
         // Structure is: Number of string fields = n -> Number of timesteps (n of these) = m -> String counts (m of these)
 
         dataFile.close();
-        logTrace("Successfully wrote string count data to binary file!");
+        logTrace("Successfully wrote string count data to binary file at path %s", filePath);
     }
     catch (std::ifstream::failure &e)
     {
@@ -1075,17 +1068,6 @@ void Simulation::calculateAcceleration()
         glBindImageTexture(bindIndex++, m_LaplacianTextures[fieldIndex].textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
     }
 
-    // Bind phases if they exist
-    if (m_RequiresPhase && m_PhaseTextures.size() > 0)
-    {
-        for (const auto &phaseTexture : m_PhaseTextures)
-        {
-            // Bind its phase
-            glActiveTexture(activeTextureIndex++);
-            glBindImageTexture(bindIndex++, phaseTexture.textureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
-        }
-    }
-
     // Dispatch and barrier
     glDispatchCompute(m_XNumGroups, m_YNumGroups, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -1233,8 +1215,34 @@ void Simulation::randomiseFields(uint32_t width, uint32_t height, uint32_t seed)
     setField(newFields);
 }
 
-void Simulation::runRandomTrials(uint32_t width, uint32_t height, uint32_t numTrials, uint32_t startSeed)
+void Simulation::runRandomTrials(uint32_t width, uint32_t height, uint32_t numTrials, uint32_t startSeed, std::string outFolder)
 {
+    // Create folder of name `outFolder` in the data directory
+    std::stringstream folderStream;
+    folderStream << "data/" << outFolder;
+    std::string folderPath = folderStream.str();
+
+    // Handle when the given folder name is invalid
+    try
+    {
+        // TODO: This is a bit hacky, but not sure how to delete a folder's contents and not the folder itself
+        // Check if folder exists, and if so delete it and all of its contents
+        if (std::filesystem::exists(folderPath))
+        {
+            // Clear folder of all files
+            std::filesystem::remove_all(folderPath.c_str());
+            logTrace("Cleared folder at %s of all files.", folderPath.c_str());
+        }
+        // Create the folder
+        std::filesystem::create_directory(folderPath);
+        logInfo("Created a new folder at %s in the data directory.", folderPath.c_str());
+    }
+    catch (std::filesystem::filesystem_error &e)
+    {
+        logWarning("The given folder name %s is invalid! Aborting trials... Please input a valid folder name and try again.", outFolder.c_str());
+        return;
+    }
+
     // Generate seeds
     std::default_random_engine seedGenerator;
     seedGenerator.seed(startSeed);
@@ -1255,7 +1263,7 @@ void Simulation::runRandomTrials(uint32_t width, uint32_t height, uint32_t numTr
         }
 
         std::stringstream nameStream;
-        nameStream << "data/trial_data/string_count_trial" << trialIndex << ".ctdsd";
+        nameStream << folderPath << "/string_count_trial" << trialIndex << ".ctdsd";
 
         saveStringNumbers(nameStream.str().c_str());
     }

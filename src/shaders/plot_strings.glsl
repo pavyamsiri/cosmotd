@@ -42,5 +42,5 @@ void main()
     vec4 fieldColor = texture(inFieldColorMap, vec2(fieldUV, 0.5f));
     vec4 stringColor = texture(inStringColorMap, vec2(stringUV, 0.5f));
 
-    outColor = mix(fieldColor, stringColor, abs(stringValue));
+    outColor = mix(fieldColor, stringColor, 0.75f * abs(stringValue));
 }

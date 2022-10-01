@@ -44,6 +44,7 @@ add_executable(cosmotd
     external/imgui/imgui_impl_opengl3.cpp
     external/imgui/imgui_tables.cpp
     external/imgui/imgui_widgets.cpp
+    external/imgui/imgui_stdlib.cpp
     external/imgui/imgui.cpp
 )
 
