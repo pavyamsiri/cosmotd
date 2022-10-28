@@ -29,90 +29,66 @@ string counts. Can't fit a power law to this.
 - Can't log and use y = mx + b because that implies the power law goes y = ax^q which means offset is always zero. This is not
 true for simulations which tend to some stable string count (positive offset). Log of y = ax^q + c is not trivial in terms
 as the + c can't be easily separated.
-- Configurations that have bad fits:
-    - N1112
-    - N1121
-    - N1123
-    - N1132
-    - N1211
-    - N1213
-    - N1221
-    - N1223
-    - N1232
-    - N1233
-    - N2111
-    - N2112
-    - N2113
-    - N2122
-    - N2123
-    - N2131
-    - N2132
-    - N2133
-    - N2212 (string detection is too sensitive on curved surfaces)
-    - N2232*
-- TODO: Field configurations to test:
-    - [X] N1112
-    - [X] N1113
-    - [X] N1121
-    - [X] N1123
-    - [X] N1131
-    - [X] N1132
-    - [X] N1211
-    - [X] N1213
-    - [X] N1221
-    - [X] N1222
-    - [X] N1223
-    - [X] N1231
-    - [X] N1232
-    - [X] N1233
-    - [X] N1311
-    - [X] N1312
-    - [X] N1321
-    - [X] N1322
-    - [X] N1323
-    - [X] N1331
-    - [X] N1332
-    - [X] N1333
-    - [X] N2111
-    - [X] N2112
-    - [X] N2113
-    - [X] N2122
-    - [X] N2123
-    - [X] N2131
-    - [X] N2132
-    - [X] N2133
-    - [X] N2212
-    - [X] N2213
-    - [X] N2221
-    - [X] N2223
-    - [X] N2231
-    - [X] N2232
-    - [X] N2311
-    - [X] N2312
-    - [X] N2313
-    - [X] N2321
-    - [X] N2322
-    - [X] N2331
-    - [X] N2332
-    - [X] N2333
-    - [X] N3111
-    - [X] N3112
-    - [X] N3113
-    - [X] N3121
-    - [X] N3122
-    - [X] N3123
-    - [X] N3132
-    - [X] N3133
-    - [X] N3211
-    - [X] N3212
-    - [X] N3221
-    - [X] N3222
-    - [X] N3223
-    - [X] N3231
-    - [X] N3233
-    - [X] N3312
-    - [X] N3313
-    - [X] N3321
-    - [X] N3323
-    - [X] N3331
-    - [X] N3332
+- Configurations that have bad fits (TODO: Categorise):
+    <!-- Z -> Goes to zero -->
+    <!-- S -> Strange pattern -->
+    <!-- C -> Close to zero but not zero -->
+    <!-- H -> One field is zero or almost zero but the other field is not -->
+    <!-- N -> Not going to disperse -->
+    - N1112 [Z]
+    - N1121 [Z]
+    - N1123 [Z]
+    - N1132 [Z]
+    - N1211 [Z]
+    - N1213 [Z]
+    - N1221 [S]
+    - N1222 [S] (There is a weird loop like thing)
+    - N1223 [Z]
+    - N1231 [S]
+    - N1232 [S]
+    - N1233 [S]
+    - N1312 [C]
+    - N2111 [Z]
+    - N2112 [S]
+    - N2113 [S]
+    - N2122 [S]
+    - N2123 [S]
+    - N2131 [Z]
+    - N2132 [Z]
+    - N2133 [S]
+    - N2212 [S]
+    - N2213 [S]
+    - N2221 [H]
+    - N2223 [H]
+    - N2231 [N]
+    - N2232 [H]
+- N = 1 or N' = 1 configurations:
+    - N1113 does not disperse but N1213 does. N1413 does not seem to disperse either.
+    - N1131 does not disperse.
+    - N1221 does disperse but not always to zero. It does not always disperse (at least within the time range used).
+    - N1231 does disperse but not always to zero.
+
+U - Unstable Walls (Single Wall Pattern)
+U+ - Unstable + Dual Wall Pattern (in one field, the other field has strange lines)
+Ul - Unstable + Loops (in one field, the other field has alternating domains)
+S - Stable Walls
+S' - Nearly Unstable Walls
+Sa - Stable Walls but with alternating domains on either side (could decay but very slow)
+Ne - No strings but has domain walls?
+
+Add s for can decay but slow
+Add + for dual pattern
+Add m for multidomain
+Add ! for further inspection
+
+Increasing kappa should lead to more stable walls. We know that N3111 produces stable walls when kappa = 0.04 (small). But if
+kappa = 1, then Ng and Ng' would be on equal footing with N and N' and so N1131 will be stable as well (these are stable when kappa
+is small as well). I think stability will still increase in that the domain wall length would be decrease less as small kappa
+causes the walls to shrink more before becoming stable (in some cases the walls can fully decay, guessing there is enough energy
+to overcome gap).
+
+Ideally I can cut down the number of configurations in half. phi and psi are symmetric fields and so N3111 vs N1311 should be
+the same and N2123 and N1232.
+
+N1221 at kappa = 0.04 can decay if left for long enough.
+N1221 at kappa = 1 won't decay

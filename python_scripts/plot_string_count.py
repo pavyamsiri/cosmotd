@@ -22,12 +22,16 @@ FILL_COLORS = ["tab:blue", "tab:orange"]
 FIELD_NAMES = ["phi", "psi"]
 
 
-def main(args: list[str]):
+def main(args: list[str]) -> bool:
     # Parse CL arguments
     parsed_args = _parse_args(args)
     folder_name = parsed_args.data_folder
     start_time = parsed_args.min_timestep
     end_time = parsed_args.max_timestep
+    save_files_flag = parsed_args.save_files
+    show_plots_flag = parsed_args.show_plots
+
+    bad_fit_flag = False
 
     # Grab all trial data files, assuming they conform to the set naming scheme
     string_count_file_names = list(
@@ -36,9 +40,10 @@ def main(args: list[str]):
 
     # Exit out if there are no such data files
     num_trials = len(string_count_file_names)
+    num_trials = 100
     if num_trials == 0:
         print(f"The given folder {folder_name} does not contain any string count data!")
-        return
+        return bad_fit_flag
 
     # Grab header information from a data file
     num_fields, max_time, dt = get_string_count_file_header(string_count_file_names[0])
@@ -71,6 +76,7 @@ def main(args: list[str]):
         for field_idx in range(num_fields):
             # Consider only times between start_time and end_time
             current_string_count = string_counts[field_idx, start_time:max_time]
+            current_string_count /= 256 * 256
             string_count_data[field_idx][trial_idx, :] = current_string_count
 
             with warnings.catch_warnings():
@@ -81,8 +87,8 @@ def main(args: list[str]):
                     power_law_func,
                     time_range,
                     current_string_count,
-                    # bounds=((-np.inf, -np.inf, -np.inf), (np.inf, np.inf, np.inf)),
-                    bounds=((-np.inf, -np.inf, 0), (np.inf, np.inf, np.inf)),
+                    p0=(0.1, 0.1, 0.1),
+                    bounds=((0, 0, 0), (+np.inf, +np.inf, +np.inf)),
                 )
                 # Store fits
                 power_scale_data[field_idx][trial_idx] = a
@@ -117,8 +123,16 @@ def main(args: list[str]):
         # exponent_mean = np.mean(power_law_data[field_idx])
         # offset_mean = np.mean(power_offset_data[field_idx])
         # Error of curve fit values
+        scale_error = np.std(power_scale_data[field_idx])
         exponent_error = np.std(power_law_data[field_idx])
         offset_error = np.std(power_offset_data[field_idx])
+
+        if (
+            offset_error > offset_median
+            or exponent_error > exponent_median
+            or scale_error > scale_median
+        ):
+            bad_fit_flag = True
 
         # Store median and error
         power_law_fits["exponent_median"].append(exponent_median)
@@ -130,7 +144,7 @@ def main(args: list[str]):
         # choose?
         # Plot power law fit using median values
         ax_power_law.plot(
-            range(start_time, max_time),
+            time_range,
             power_law_func(
                 time_range,
                 scale_median,
@@ -143,7 +157,7 @@ def main(args: list[str]):
         )
         # Plot the string count data as a range using the above lower and upper bounds
         ax_power_law.fill_between(
-            range(start_time, max_time),
+            time_range,
             string_lower_bound,
             string_upper_bound,
             label=f"$\\{FIELD_NAMES[field_idx]}$ data",
@@ -162,10 +176,10 @@ def main(args: list[str]):
         )
 
     # Plotting configuration
-    ax_power_law.set_xscale("symlog")
-    ax_power_law.set_yscale("symlog")
-    ax_power_law.set_xlim(start_time, end_time)
-    ax_power_law.set_xlabel("Timestep")
+    ax_power_law.set_xscale("log")
+    ax_power_law.set_yscale("log")
+    ax_power_law.set_xlim(np.min(time_range), np.max(time_range))
+    ax_power_law.set_xlabel("Time")
     ax_power_law.set_ylabel("String count")
 
     # Plot boxplot of exponents
@@ -176,16 +190,22 @@ def main(args: list[str]):
     ax_power_law.legend()
 
     # Show, save and close
-    plt.show()
-    fig_power_law.savefig(f"{folder_name}/power_law_fit.png")
-    fig_power_exponent.savefig(f"{folder_name}/boxplot.png")
+    if show_plots_flag:
+        plt.show()
+    if save_files_flag:
+        fig_power_law.savefig(f"{folder_name}/power_law_fit.png")
+        fig_power_exponent.savefig(f"{folder_name}/boxplot.png")
+        # Write out exponent data as .csv
+        exponent_df = pd.DataFrame.from_dict(power_law_fits)
+        exponent_df.index.name = "Field"
+        exponent_df.to_csv(f"{folder_name}/power_law_exponent.csv")
+
     plt.close(fig_power_law)
     plt.close(fig_power_exponent)
 
-    # Write out exponent data as .csv
-    exponent_df = pd.DataFrame.from_dict(power_law_fits)
-    exponent_df.index.name = "Field"
-    exponent_df.to_csv(f"{folder_name}/power_law_exponent.csv")
+    if bad_fit_flag:
+        print(f"{folder_name} produces a bad fit!")
+    return bad_fit_flag
 
 
 def _parse_args(args: list[str]) -> argparse.Namespace:
@@ -207,6 +227,12 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         type=int,
         help="The maximum timestep to consider. For most simulations after 280 unit times, the field becomes unstable.",
     )
+    parser.add_argument(
+        "-s", "--s", "-save", "--save", dest="save_files", action="store_true"
+    )
+    parser.add_argument(
+        "-p", "--p", "-plot", "--plot", dest="show_plots", action="store_true"
+    )
 
     parsed_args = parser.parse_args(args)
     return parsed_args
@@ -225,6 +251,18 @@ def get_string_count_file_header(file_name: str) -> tuple[int, int, float]:
 
 def power_law_func(x, a, q, c):
     return a * x ** (-q) + c
+
+
+def exponential_decay_func(x, a, q, c):
+    return a * np.exp(-q * x) + c
+
+
+def tanh_func(x, a, q, c):
+    return a * np.tanh(-q * x) + c
+
+
+def gaussian_decay_func(x, a, q, c):
+    return a * np.exp(-q * x**2) + c
 
 
 def parse_sc_data_file(file_name):
